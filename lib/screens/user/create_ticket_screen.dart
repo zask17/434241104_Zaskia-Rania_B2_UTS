@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../models/ticket.dart';
-import '../../data/dummy_data.dart';
+// import '../../models/ticket.dart';
 import '../../data/session.dart';
+import '../../services/api_service.dart';
 
 class CreateTicketScreen extends StatefulWidget {
   const CreateTicketScreen({super.key});
@@ -14,48 +14,59 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final ApiService _apiService = ApiService();
   String? _selectedCategory;
   String? _selectedPriority;
+  bool _isSubmitting = false;
 
-  void _submitForm() {
+  void _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      // 1. Tentukan Priority Enum
-      TicketPriority priority = TicketPriority.medium;
-      if (_selectedPriority == 'Low') priority = TicketPriority.low;
-      if (_selectedPriority == 'High') priority = TicketPriority.high;
+      setState(() => _isSubmitting = true);
 
-      // 2. Buat objek Tiket baru
-      final newTicket = Ticket(
-        id: 'TKT-00${DummyData.tickets.length + 1}',
-        title: _titleController.text,
-        description: _descriptionController.text,
-        status: TicketStatus.open,
-        priority: priority,
-        category: _selectedCategory ?? 'General',
-        createdAt: DateTime.now(),
-        creatorId: Session.currentUser?.id ?? '3',
-        creatorName: Session.currentUser?.name ?? 'Regular User',
-        history: [
-          TicketHistory(
-            message: 'Tiket berhasil dibuat',
-            timestamp: DateTime.now(),
-            userName: Session.currentUser?.name ?? 'Regular User',
+      final String uniqueTicketId = ApiService.generateTicketId();
+
+      // Memetakan struktur payload ke format JSON kolom tabel tickets Supabase
+      final Map<String, dynamic> ticketPayload = {
+        'id': uniqueTicketId,
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'priority': _selectedPriority?.toLowerCase() ?? 'medium',
+        'category': _selectedCategory ?? 'General',
+        'creator_id': Session.currentUser?.id ?? '3',
+        'creator_name': Session.currentUser?.name ?? 'Regular User',
+      };
+
+      // 1. Eksekusi penyimpanan tiket baru di Supabase Cloud via REST API
+      final bool ticketCreated = await _apiService.createTicket(ticketPayload);
+
+      if (ticketCreated) {
+        // 2. Tembak relasi log pembuatan awal ke tabel ticket_histories
+        await _apiService.createHistoryLog(
+          ticketId: uniqueTicketId,
+          message: 'Tiket berhasil dibuat (Status: OPEN)',
+          userName: Session.currentUser?.name ?? 'Regular User',
+        );
+
+        if (!mounted) return;
+        Navigator.pop(context, true);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tiket berhasil disimpan secara cloud ke Supabase!'),
+            backgroundColor: Colors.green,
           ),
-        ],
-      );
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal menyimpan tiket ke server database.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
 
-      // 3. Tambahkan ke list global DummyData
-      DummyData.tickets.insert(0, newTicket);
-
-      // 4. Kembali ke halaman sebelumnya
-      Navigator.pop(context, true); 
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tiket berhasil dibuat dan ditambahkan ke daftar'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      setState(() => _isSubmitting = false);
     }
   }
 
@@ -63,7 +74,9 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Buat Tiket Baru')),
-      body: SingleChildScrollView(
+      body: _isSubmitting
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,

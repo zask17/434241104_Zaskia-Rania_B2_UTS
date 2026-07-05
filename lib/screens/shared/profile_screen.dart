@@ -89,11 +89,11 @@ class ProfileScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16.0),
             child: ElevatedButton.icon(
               onPressed: () {
-                Session.currentUser = null;
+                Session.clear(); // Hapus data sesi login di memori device
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
+                      (route) => false,
                 );
               },
               icon: const Icon(Icons.logout),
