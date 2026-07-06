@@ -138,7 +138,6 @@ class _StatusBadge extends StatelessWidget {
     switch (status) {
       case TicketStatus.open: color = Colors.blue; text = 'Open'; break;
       case TicketStatus.inProgress: color = Colors.orange; text = 'In Progress'; break;
-      case TicketStatus.resolved: color = Colors.green; text = 'Resolved'; break;
       case TicketStatus.closed: color = Colors.grey; text = 'Closed'; break;
     }
     return Container(

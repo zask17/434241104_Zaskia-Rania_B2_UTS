@@ -1,4 +1,4 @@
-enum TicketStatus { open, inProgress, resolved, closed }
+enum TicketStatus { open, inProgress, closed }
 enum TicketPriority { low, medium, high }
 
 class Ticket {

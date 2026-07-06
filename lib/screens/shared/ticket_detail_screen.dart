@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart'; // Untuk kIsWeb
 import 'package:flutter/material.dart';
 import '../../models/ticket.dart';
 import '../../models/user.dart';
@@ -20,6 +22,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   List<dynamic> _ticketHistoryList = [];
   List<dynamic> _ticketCommentList = [];
   final TextEditingController _commentController = TextEditingController();
+
+  // State bantuan untuk fitur membalas komentar
+  String? _replyToUser;
 
   @override
   void initState() {
@@ -67,19 +72,27 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
     final currentUserName = Session.currentUser?.name ?? 'User';
 
+    // Jika sedang membalas seseorang, sisipkan tag nama di depannya
+    final finalCommentText = _replyToUser != null
+        ? '[Membalas $_replyToUser]: $commentText'
+        : commentText;
+
     final success = await _apiService.createComment(
       ticketId: _currentTicket.id,
-      text: commentText,
+      text: finalCommentText,
       userName: currentUserName,
     );
 
     if (success) {
       _commentController.clear();
+      setState(() {
+        _replyToUser = null; // Reset status reply setelah terkirim
+      });
       _fetchTicketComments();
     } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal mengirim komentar ke database.')),
+        const SnackBar(content: Text('Gagal mengirim komentar.')),
       );
     }
   }
@@ -87,7 +100,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   // Aksi Admin: Mengubah status dari 'open' ke 'inProgress' dan menugaskan helpdesk
   void _handleAssignToHelpdesk() async {
     setState(() => _isLoading = true);
-    const String helpdeskStaffId = "2"; // Default ID Helpdesk Staff sesuai Seeder SQL
+    const String helpdeskStaffId = "2";
 
     try {
       final success = await _apiService.assignTicketToHelpdesk(_currentTicket.id, helpdeskStaffId);
@@ -127,38 +140,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
-  // Aksi Helpdesk: Mengubah status dari 'inProgress' ke 'resolved'
-  void _handleResolveTicket() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final success = await _apiService.updateTicketStatus(_currentTicket.id, TicketStatus.resolved.name, '');
-
-      if (success) {
-        await _apiService.createHistoryLog(
-          ticketId: _currentTicket.id,
-          message: 'Helpdesk menandai keluhan telah terselesaikan (Status: Resolved)',
-          userName: Session.currentUser?.name ?? 'Helpdesk',
-        );
-
-        setState(() {
-          _currentTicket = _currentTicket.copyWith(status: TicketStatus.resolved);
-        });
-        await _fetchTicketHistory();
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Status diperbarui menjadi RESOLVED.'), backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      debugPrint("Error resolving ticket: $e");
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // Aksi Helpdesk: Menutup tiket secara permanen ('closed')
+  // Aksi Helpdesk: Menutup tiket secara permanen ('closed') langsung dari 'inProgress'
   void _handleFinishTicket() async {
     setState(() => _isLoading = true);
 
@@ -167,7 +149,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     if (success) {
       await _apiService.createHistoryLog(
         ticketId: _currentTicket.id,
-        message: 'Pekerjaan selesai, tiket ditutup permanen (Status: CLOSED)',
+        message: 'Pekerjaan selesai oleh Helpdesk, tiket ditutup permanen (Status: CLOSED)',
         userName: Session.currentUser?.name ?? 'Helpdesk',
       );
 
@@ -178,7 +160,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       await _fetchTicketHistory();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tiket resmi diselesaikan dan dikunci di database!'), backgroundColor: Colors.grey),
+        const SnackBar(
+          content: Text('Tiket resmi diselesaikan dan dikunci di database!'),
+          backgroundColor: Colors.grey,
+        ),
       );
     } else {
       if (!mounted) return;
@@ -198,7 +183,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
     final isOpen = _currentTicket.status == TicketStatus.open;
     final isInProgress = _currentTicket.status == TicketStatus.inProgress;
-    final isResolved = _currentTicket.status == TicketStatus.resolved;
     final isClosed = _currentTicket.status == TicketStatus.closed;
 
     return Scaffold(
@@ -230,28 +214,38 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             Text(_currentTicket.description),
             const SizedBox(height: 16),
 
-            // TAMPILKAN LAMPIRAN FOTO JIKA ADA
+            // 📸 INTEGRASI: MENAMPILKAN FOTO YANG DIKIRIM DI TIKET
             if (_currentTicket.attachments.isNotEmpty) ...[
-              Text('Lampiran File / Foto:', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              Text('Lampiran Foto Keluhan:', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _currentTicket.attachments.map((fileName) {
+                spacing: 12,
+                runSpacing: 12,
+                children: _currentTicket.attachments.map((fileSource) {
+                  final isNetworkUrl = fileSource.startsWith('http://') || fileSource.startsWith('https://');
+
                   return Container(
-                    padding: const EdgeInsets.all(8),
+                    width: 140,
+                    height: 140,
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                      border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.insert_drive_file, color: Colors.blue, size: 18),
-                        const SizedBox(width: 6),
-                        Text(fileName, style: const TextStyle(fontSize: 13)),
-                      ],
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: isNetworkUrl
+                          ? Image.network(
+                        fileSource,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                      )
+                          : kIsWeb
+                          ? const Center(child: Icon(Icons.insert_drive_file, color: Colors.blue))
+                          : Image.file(
+                        File(fileSource),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                      ),
                     ),
                   );
                 }).toList(),
@@ -259,9 +253,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             ],
             const Divider(height: 32),
 
-            // ALUR KONTROL STATUS (WORKFLOW DYNAMIC BUTTONS)
+            // ALUR KONTROL STATUS TERBARU (RESOLVED DIHAPUS)
             if (!isClosed) ...[
-              // 1. Tombol khusus Admin jika tiket masih berstatus 'OPEN'
+              // 1. Aksi Admin mengalihkan dari OPEN -> IN PROGRESS
               if (isAdmin && isOpen) ...[
                 ElevatedButton.icon(
                   onPressed: _handleAssignToHelpdesk,
@@ -276,23 +270,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 const SizedBox(height: 16),
               ],
 
-              // 2. Tombol khusus Helpdesk jika status sudah 'In Progress'
+              // 2. Aksi Helpdesk langsung menutup tiket dari IN PROGRESS -> CLOSED
               if (isHelpdesk && isInProgress) ...[
-                ElevatedButton.icon(
-                  onPressed: _handleResolveTicket,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                  ),
-                  icon: const Icon(Icons.build_circle_outlined),
-                  label: const Text('Tandai Selesai Perbaikan (Set Resolved)'),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // 3. Tombol khusus Helpdesk jika status sudah 'Resolved' menuju 'Closed'
-              if (isHelpdesk && isResolved) ...[
                 ElevatedButton.icon(
                   onPressed: _handleFinishTicket,
                   style: ElevatedButton.styleFrom(
@@ -306,14 +285,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 const SizedBox(height: 16),
               ],
             ] else ...[
-              // Tampilan jika tiket sudah CLOSED (Kunci Semua Proses)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                 ),
                 child: const Text(
                   'Tiket ini telah diselesaikan & ditutup (Closed). Sesi kontrol dihentikan.',
@@ -343,7 +321,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         children: [
                           const Icon(Icons.check_circle, color: Colors.blue, size: 20),
                           if (index != _ticketHistoryList.length - 1)
-                            Container(width: 2, height: 40, color: Colors.blue.withOpacity(0.3)),
+                            Container(width: 2, height: 40, color: Colors.blue.withValues(alpha: 0.3)),
                         ],
                       ),
                       const SizedBox(width: 12),
@@ -378,9 +356,17 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               separatorBuilder: (context, index) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final comment = _ticketCommentList[index];
+                final commentText = comment['comment_text'] ?? '';
+                final isReply = commentText.startsWith('[Membalas');
+
                 return Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.grey.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
+                  margin: isReply ? const EdgeInsets.only(left: 24) : EdgeInsets.zero,
+                  decoration: BoxDecoration(
+                    color: isReply ? Colors.blue.withValues(alpha: 0.02) : Colors.grey.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: isReply ? Border.all(color: Colors.blue.withValues(alpha: 0.1)) : null,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -394,8 +380,21 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(comment['comment_text'] ?? ''),
+                      const SizedBox(height: 6),
+                      Text(commentText),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _replyToUser = comment['user_name'];
+                            });
+                          },
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(50, 30)),
+                          icon: const Icon(Icons.reply, size: 14, color: Colors.grey),
+                          label: const Text('Balas', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        ),
+                      )
                     ],
                   ),
                 );
@@ -403,10 +402,27 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             ),
             const SizedBox(height: 16),
 
+            if (_replyToUser != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                margin: const EdgeInsets.only(bottom: 8),
+                color: Colors.amber.withValues(alpha: 0.15),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Membalas komentar dari: $_replyToUser', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                    GestureDetector(
+                      onTap: () => setState(() => _replyToUser = null),
+                      child: const Icon(Icons.cancel, size: 16, color: Colors.grey),
+                    )
+                  ],
+                ),
+              ),
+
             TextField(
               controller: _commentController,
               decoration: InputDecoration(
-                hintText: 'Tambahkan komentar...',
+                hintText: _replyToUser != null ? 'Tulis balasan...' : 'Tambahkan komentar...',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.send, color: Colors.blue),
@@ -432,7 +448,6 @@ class _StatusBadge extends StatelessWidget {
     switch (status) {
       case TicketStatus.open: color = Colors.blue; text = 'Open'; break;
       case TicketStatus.inProgress: color = Colors.orange; text = 'In Progress'; break;
-      case TicketStatus.resolved: color = Colors.green; text = 'Resolved'; break;
       case TicketStatus.closed: color = Colors.grey; text = 'Closed'; break;
     }
     return Container(

@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart'; // Tambahkan package image_picker
 import '../../data/session.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 import '../../services/api_service.dart';
 
 class CreateTicketScreen extends StatefulWidget {
@@ -22,21 +24,33 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
   bool _isSubmitting = false;
 
   // 1. Variabel untuk menyimpan file gambar yang dipilih
-  File? _selectedImage;
+  File? _selectedImage;          // Untuk mobile
+  Uint8List? _webImageBytes;     // Tambahkan ini untuk menampung bytes gambar di Web
   final ImagePicker _picker = ImagePicker();
 
   // 2. Fungsi untuk mengambil gambar dari galeri
   Future<void> _pickImage() async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery, // ✅ Diperbaiki menjadi gallery
+        source: ImageSource.gallery,
         imageQuality: 80,
       );
 
       if (pickedFile != null) {
-        setState(() {
-          _selectedImage = File(pickedFile.path);
-        });
+        if (kIsWeb) {
+          // Jika berjalan di Web, baca gambar sebagai Bytes
+          final bytes = await pickedFile.readAsBytes();
+          setState(() {
+            _webImageBytes = bytes;
+            // Kita pakai nama file tiruan/asli untuk pelengkap payload nanti
+            _selectedImage = File(pickedFile.name);
+          });
+        } else {
+          // Jika berjalan di Mobile (Android/iOS)
+          setState(() {
+            _selectedImage = File(pickedFile.path);
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error picking image: $e');
@@ -47,10 +61,11 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
     }
   }
 
-  // 3. Fungsi untuk menghapus gambar yang sudah dipilih
+  // 4. Perbarui juga fungsi _removeImage kamu:
   void _removeImage() {
     setState(() {
       _selectedImage = null;
+      _webImageBytes = null; // Reset bytes web
     });
   }
 
@@ -185,8 +200,15 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          _selectedImage!,
+                        child: kIsWeb
+                            ? Image.memory(
+                          _webImageBytes!, // Menampilkan dari memori bytes jika di Web
+                          width: 70,
+                          height: 70,
+                          fit: BoxFit.cover,
+                        )
+                            : Image.file(
+                          _selectedImage!, // Menampilkan dari file path jika di Mobile
                           width: 70,
                           height: 70,
                           fit: BoxFit.cover,
