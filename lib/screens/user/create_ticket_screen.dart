@@ -76,14 +76,6 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
       final String uniqueTicketId = ApiService.generateTicketId();
       List<String> attachmentsList = [];
 
-      // 💡 CATATAN STRATEGI UPLOAD:
-      // Jika kamu punya fungsi upload ke Supabase Storage di ApiService, jalankan di sini:
-      // if (_selectedImage != null) {
-      //   String? imageUrl = await _apiService.uploadAttachment(_selectedImage!);
-      //   if (imageUrl != null) attachmentsList.add(imageUrl);
-      // }
-
-      // Sebagai fallback lokal sementara sebelum di-upload ke Cloud Storage:
       if (_selectedImage != null) {
         attachmentsList.add(_selectedImage!.path.split('/').last);
       }
@@ -96,7 +88,7 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
         'category': _selectedCategory ?? 'General',
         'creator_id': Session.currentUser?.id ?? '3',
         'creator_name': Session.currentUser?.name ?? 'Regular User',
-        'attachments': attachmentsList, // Memasukkan list lampiran sesuai model Ticket
+        'attachments': attachmentsList,
       };
 
       final bool ticketCreated = await _apiService.createTicket(ticketPayload);

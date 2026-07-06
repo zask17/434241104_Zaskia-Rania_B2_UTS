@@ -52,7 +52,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Tidak ada data tiket di database.'));
+            return const Center(child: Text('Tidak ada data tiket.'));
           }
 
           final allTickets = snapshot.data!;

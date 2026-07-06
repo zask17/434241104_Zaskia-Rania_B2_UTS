@@ -67,7 +67,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'name': _nameController.text.trim(),
         'email': _emailController.text.trim().toLowerCase(),
         'password': _passwordController.text.trim(),
-        'role_id': 3, // role_id = 3 (Regular User)
+        'role_id': 3,
       };
 
       final result = await _apiService.registerUser(userPayload);

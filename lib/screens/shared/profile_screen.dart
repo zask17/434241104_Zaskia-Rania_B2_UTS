@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../auth/login_screen.dart';
+import '../shared/setting_screen.dart';
 import '../../data/session.dart';
 import '../../data/theme_settings.dart';
 
@@ -33,7 +34,14 @@ class ProfileScreen extends StatelessWidget {
             leading: const Icon(Icons.settings),
             title: const Text('Pengaturan'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SettingScreen(),
+                ),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.help_outline),

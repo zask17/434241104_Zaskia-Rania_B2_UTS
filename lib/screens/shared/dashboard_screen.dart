@@ -3,6 +3,7 @@ import 'ticket_list_screen.dart';
 import '../user/create_ticket_screen.dart';
 import 'profile_screen.dart';
 import 'ticket_detail_screen.dart';
+import 'notification_screen.dart';
 import '../../data/session.dart';
 import '../../models/user.dart';
 import '../../models/ticket.dart';
@@ -69,17 +70,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
-
-      // CONTOH PENULISAN DI DALAM DASHBOARD_SCREEN.DART KAMU:
       floatingActionButton: (_selectedIndex == 1 && isUser)
           ? FloatingActionButton(
         onPressed: () async {
-          // Tunggu hasil return dari halaman CreateTicket
           final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const CreateTicketScreen()),
           );
-          // 💡 JIKA RESULT TRUE, REFRESH HALAMAN UTAMA SECARA OTOMATIS
           if (result == true) {
             setState(() {});
           }
@@ -87,19 +84,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: const Icon(Icons.add),
       )
           : null,
-
-      // floatingActionButton: (_selectedIndex == 1 && isUser)
-      //     ? FloatingActionButton(
-      //   onPressed: () async {
-      //     final result = await Navigator.push(
-      //       context,
-      //       MaterialPageRoute(builder: (context) => const CreateTicketScreen()),
-      //     );
-      //     if (result == true) setState(() {});
-      //   },
-      //   child: const Icon(Icons.add),
-      // )
-      //     : null,
     );
   }
 }
@@ -126,7 +110,23 @@ class _DashboardHomeState extends State<DashboardHome> {
     final user = Session.currentUser;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard')),
+      // 🔔 KOREKSI INTEGRASI: Menambahkan tombol lonceng notifikasi ke dalam AppBar
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NotificationScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: FutureBuilder<List<Ticket>>(
         future: _ticketsFuture,
         builder: (context, snapshot) {
@@ -136,12 +136,10 @@ class _DashboardHomeState extends State<DashboardHome> {
 
           List<Ticket> allTickets = snapshot.data ?? [];
 
-          // Filter data jika user biasa, hanya hitung tiket miliknya sendiri
           if (user?.role == UserRole.user) {
             allTickets = allTickets.where((t) => t.creatorId == user!.id).toList();
           }
 
-          // Menghitung statistik berdasarkan status data riil API Supabase
           final totalTickets = allTickets.length;
           final openTickets = allTickets.where((t) => t.status == TicketStatus.open).length;
           final inProgressTickets = allTickets.where((t) => t.status == TicketStatus.inProgress).length;

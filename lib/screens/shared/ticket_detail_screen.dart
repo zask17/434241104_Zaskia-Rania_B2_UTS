@@ -161,7 +161,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Tiket resmi diselesaikan dan dikunci di database!'),
+          content: Text('Tiket resmi diselesaikan dan dikunci!'),
           backgroundColor: Colors.grey,
         ),
       );

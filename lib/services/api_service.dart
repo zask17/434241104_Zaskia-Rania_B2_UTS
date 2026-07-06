@@ -7,19 +7,27 @@ class ApiService {
   static const String baseUrl = 'https://azgcylimfoggyiihpnib.supabase.co/rest/v1';
   static const String anonKey = 'sb_publishable_jvyp0o4ijJLjP0IQJRmkJQ__83qa3uf';
 
-  /// Helper untuk mengenerate ID unik user dengan pola USR-XXXXXX
+  /// Helper untuk mengenerate ID unik user dengan pola USR- dan 12 digit urutan angka
   static String generateUserId() {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final randomSuffix = (timestamp % 1000000).toString().padLeft(6, '0');
-    return 'USR-$randomSuffix';
+    final sequence = (timestamp % 1000000000000).toString().padLeft(12, '0');
+
+    return 'USR-$sequence';
   }
 
-  /// Helper untuk mengenerate ID unik tiket dengan pola TKT-XXXXXX
+  /// Helper untuk mengenerate ID unik tiket dengan pola TKT-YYYYMMDD + 4 digit waktu unik
   static String generateTicketId() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final randomSuffix = (timestamp % 1000000).toString().padLeft(6, '0');
-    return 'TKT-$randomSuffix';
+    final now = DateTime.now();
+    final year = now.year.toString();
+    final month = now.month.toString().padLeft(2, '0');
+    final day = now.day.toString().padLeft(2, '0');
+
+    // Ambil 4 digit unik dari milliseconds untuk menghindari tabrakan ID di hari yang sama
+    final uniqueSuffix = (now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0');
+
+    return 'TKT-$year$month$day$uniqueSuffix';
   }
+
 
   /// Header standar untuk Supabase PostgREST API.
   Map<String, String> _getHeaders({String? userToken}) {
@@ -321,4 +329,32 @@ class ApiService {
       return false;
     }
   }
-} // <--- Kurung kurawal penutup kelas ApiService sekarang ada di paling bawah!
+
+  // ==================== NOTIFICATIONS ====================
+
+  /// Mengambil daftar notifikasi terbaru dari database Supabase secara riil
+  Future<List<dynamic>?> fetchLiveNotifications({required int roleId, required String userId}) async {
+    try {
+      // Filter query bertingkat sesuai hak target role / target user id
+      String queryUrl = '$baseUrl/notifications?select=*&order=created_at.desc';
+      if (roleId == 3) {
+        queryUrl += '&target_user_id=eq.$userId';
+      } else {
+        queryUrl += '&target_role_id=eq.$roleId';
+      }
+
+      final response = await http.get(
+        Uri.parse(queryUrl),
+        headers: _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Fetch Live Notifications Error: $e');
+      return null;
+    }
+  }
+}

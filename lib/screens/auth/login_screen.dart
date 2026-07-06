@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'register_screen.dart';
 import '../shared/dashboard_screen.dart';
+import '../auth/forgot_password_screen.dart';
 import '../../data/session.dart';
 import '../../services/api_service.dart';
 import '../../models/user.dart';
@@ -140,10 +141,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           alignment: Alignment.centerRight,
                           child: TextButton(
                             onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Fitur Reset Password akan segera hadir'),
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ForgotPasswordScreen(),
                                 ),
                               );
                             },
