@@ -89,3 +89,13 @@ class LaptopServiceTheme {
     );
   }
 }
+
+class AppColors {
+  static const Color bgDeep = Color(0xFF121824);
+  static const Color bgElevated = Color(0xFF1E2640);
+  static const Color surface = Color(0xFF1E2640);
+  static const Color border = Color(0xFF30384D);
+  static const Color textPrimary = Colors.white;
+  static const Color textMuted = Color(0xFF94A3B8);
+  static const Color amber = Color(0xFFFF9900);
+}

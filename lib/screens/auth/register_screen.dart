@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../widget/custom_widget.dart';
+import '../../theme/app_theme.dart' show AppColors;
+import '../../data/theme_settings.dart';
 import '../../services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -10,15 +13,12 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-
   final ApiService _apiService = ApiService();
   bool _isLoading = false;
-
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -31,37 +31,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  /// Validasi format email sederhana
-  String? _validateEmail(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Harap isi email';
-    }
-    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-    if (!emailRegex.hasMatch(value.trim())) {
-      return 'Format email tidak valid';
-    }
-    return null;
-  }
-
   void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
-      // Cek kecocokan password
       if (_passwordController.text != _confirmPasswordController.text) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Konfirmasi password tidak cocok!'),
-            backgroundColor: Colors.red,
-          ),
+          const SnackBar(content: Text('Konfirmasi password tidak cocok!'), backgroundColor: Color(0xFFE0555C)),
         );
         return;
       }
 
       setState(() => _isLoading = true);
-
-      // Generate ID user unik menggunakan helper dari ApiService
       final String uniqueUserId = ApiService.generateUserId();
-
-      // Payload sesuai struktur tabel users di Supabase
       final Map<String, dynamic> userPayload = {
         'id': uniqueUserId,
         'name': _nameController.text.trim(),
@@ -71,25 +51,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       };
 
       final result = await _apiService.registerUser(userPayload);
-
       setState(() => _isLoading = false);
 
       if (result['success'] == true) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] as String? ?? 'Pendaftaran berhasil!'),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Pendaftaran berhasil!'), backgroundColor: Colors.green),
         );
-        Navigator.pop(context); // Kembali ke halaman Login
+        Navigator.pop(context);
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] as String? ?? 'Pendaftaran gagal'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(result['message'] as String? ?? 'Pendaftaran gagal'), backgroundColor: const Color(0xFFE0555C)),
         );
       }
     }
@@ -97,129 +70,106 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Register')),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(Icons.person_add_outlined,
-                        size: 80, color: Colors.orange),
-                    const SizedBox(height: 32),
-                    TextFormField(
-                      controller: _nameController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Full Name',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.person),
-                      ),
-                      validator: (value) =>
-                          (value == null || value.trim().isEmpty)
-                              ? 'Harap isi nama lengkap'
-                              : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.email),
-                      ),
-                      validator: _validateEmail,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.lock),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: Colors.grey,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeSettings.themeMode,
+      builder: (context, currentMode, _) {
+        final isDark = currentMode == ThemeMode.dark ||
+            (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+
+        // Skema token warna dinamis
+        final dynamicBgDeep = isDark ? AppColors.bgDeep : const Color(0xFFF4F6F9);
+        final dynamicBgElevated = isDark ? AppColors.bgElevated : const Color(0xFFE2E8F0);
+        final dynamicSurface = isDark ? AppColors.surface : Colors.white;
+        final dynamicBorder = isDark ? AppColors.border : const Color(0xFFCBD5E1);
+        final dynamicTextPrimary = isDark ? AppColors.textPrimary : const Color(0xFF0F172A);
+        final dynamicTextMuted = isDark ? AppColors.textMuted : const Color(0xFF64748B);
+
+        return Scaffold(
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            iconTheme: IconThemeData(color: dynamicTextPrimary),
+          ),
+          body: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [dynamicBgDeep, dynamicBgElevated],
+              ),
+            ),
+            child: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 84, height: 84,
+                            decoration: BoxDecoration(
+                              color: dynamicSurface,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: dynamicBorder, width: 1.2),
+                              boxShadow: [BoxShadow(color: AppColors.amber.withOpacity(0.15), blurRadius: 24, spreadRadius: 1)],
+                            ),
+                            child: const Icon(Icons.person_add_alt_1_rounded, size: 40, color: AppColors.amber),
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
                         ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Harap isi password';
-                        }
-                        if (value.length < 6) {
-                          return 'Password minimal 6 karakter';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      obscureText: _obscureConfirmPassword,
-                      decoration: InputDecoration(
-                        labelText: 'Confirm Password',
-                        border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.lock_reset),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureConfirmPassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: Colors.grey,
+                        const SizedBox(height: 28),
+                        Text('Create Account', textAlign: TextAlign.center, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: dynamicTextPrimary)),
+                        const SizedBox(height: 6),
+                        Text('Join us to manage diagnostics updates', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: dynamicTextMuted)),
+                        const SizedBox(height: 32),
+                        CustomTextField(controller: _nameController, label: 'Full Name', prefixIcon: Icons.person_outline_rounded),
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _emailController,
+                          label: 'Email Address',
+                          prefixIcon: Icons.alternate_email_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (v) => (v == null || v.isEmpty || !v.contains('@')) ? 'Format email tidak valid' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _passwordController,
+                          label: 'Password',
+                          prefixIcon: Icons.lock_outline_rounded,
+                          obscureText: _obscurePassword,
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: dynamicTextMuted),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _obscureConfirmPassword =
-                                  !_obscureConfirmPassword;
-                            });
-                          },
+                          validator: (v) => (v == null || v.length < 6) ? 'Password minimal 6 karakter' : null,
                         ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Harap konfirmasi password';
-                        }
-                        if (value != _passwordController.text) {
-                          return 'Password tidak cocok';
-                        }
-                        return null;
-                      },
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _confirmPasswordController,
+                          label: 'Confirm Password',
+                          prefixIcon: Icons.lock_reset_rounded,
+                          obscureText: _obscureConfirmPassword,
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscureConfirmPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: dynamicTextMuted),
+                            onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        CustomPrimaryButton(text: 'Register', isLoading: _isLoading, onPressed: _handleRegister),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _handleRegister,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Register'),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child:
-                          const Text('Already have an account? Login'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
+          ),
+        );
+      },
     );
   }
 }
