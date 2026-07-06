@@ -23,6 +23,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
     _refreshTickets();
   }
 
+  // Fungsi krusial untuk menarik ulang state data terbaru langsung dari cloud API
   void _refreshTickets() {
     setState(() {
       _ticketsFuture = _apiService.getTickets();
@@ -54,8 +55,9 @@ class _TicketListScreenState extends State<TicketListScreen> {
             return const Center(child: Text('Tidak ada data tiket di database.'));
           }
 
-          // Menyaring tiket berdasarkan ID Pembuat jika aktor yang login adalah tipe Regular User
           final allTickets = snapshot.data!;
+
+          // Menyaring tiket berdasarkan ID Pembuat jika aktor yang login adalah tipe Regular User
           final tickets = user?.role == UserRole.user
               ? allTickets.where((t) => t.creatorId == user?.id).toList()
               : allTickets;
@@ -77,6 +79,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
                       if (widget.onTicketTap != null) {
                         widget.onTicketTap!(ticket);
                       } else {
+                        // Saat kembali dari halaman detail, otomatis refresh list untuk update status terbaru
                         Navigator.push(
                           context,
                           MaterialPageRoute(

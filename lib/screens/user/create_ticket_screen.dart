@@ -1,5 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-// import '../../models/ticket.dart';
+import 'package:image_picker/image_picker.dart'; // Tambahkan package image_picker
 import '../../data/session.dart';
 import '../../services/api_service.dart';
 
@@ -15,17 +16,63 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final ApiService _apiService = ApiService();
+
   String? _selectedCategory;
   String? _selectedPriority;
   bool _isSubmitting = false;
+
+  // 1. Variabel untuk menyimpan file gambar yang dipilih
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
+
+  // 2. Fungsi untuk mengambil gambar dari galeri
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery, // ✅ Diperbaiki menjadi gallery
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal mengambil gambar.')),
+      );
+    }
+  }
+
+  // 3. Fungsi untuk menghapus gambar yang sudah dipilih
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
+  }
 
   void _submitForm() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSubmitting = true);
 
       final String uniqueTicketId = ApiService.generateTicketId();
+      List<String> attachmentsList = [];
 
-      // Memetakan struktur payload ke format JSON kolom tabel tickets Supabase
+      // 💡 CATATAN STRATEGI UPLOAD:
+      // Jika kamu punya fungsi upload ke Supabase Storage di ApiService, jalankan di sini:
+      // if (_selectedImage != null) {
+      //   String? imageUrl = await _apiService.uploadAttachment(_selectedImage!);
+      //   if (imageUrl != null) attachmentsList.add(imageUrl);
+      // }
+
+      // Sebagai fallback lokal sementara sebelum di-upload ke Cloud Storage:
+      if (_selectedImage != null) {
+        attachmentsList.add(_selectedImage!.path.split('/').last);
+      }
+
       final Map<String, dynamic> ticketPayload = {
         'id': uniqueTicketId,
         'title': _titleController.text.trim(),
@@ -34,28 +81,28 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
         'category': _selectedCategory ?? 'General',
         'creator_id': Session.currentUser?.id ?? '3',
         'creator_name': Session.currentUser?.name ?? 'Regular User',
+        'attachments': attachmentsList, // Memasukkan list lampiran sesuai model Ticket
       };
 
-      // 1. Eksekusi penyimpanan tiket baru di Supabase Cloud via REST API
       final bool ticketCreated = await _apiService.createTicket(ticketPayload);
 
       if (ticketCreated) {
-        // 2. Tembak relasi log pembuatan awal ke tabel ticket_histories
         await _apiService.createHistoryLog(
           ticketId: uniqueTicketId,
-          message: 'Tiket berhasil dibuat (Status: OPEN)',
+          message: 'Tiket berhasil dibuat dengan lampiran (Status: OPEN)',
           userName: Session.currentUser?.name ?? 'Regular User',
         );
 
         if (!mounted) return;
-        Navigator.pop(context, true);
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Tiket berhasil disimpan secara cloud ke Supabase!'),
+            content: Text('Tiket berhasil disimpan!'),
             backgroundColor: Colors.green,
           ),
         );
+
+        Navigator.pop(context, true);
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -66,7 +113,7 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
         );
       }
 
-      setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -121,12 +168,48 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                 validator: (value) => (value == null || value.isEmpty) ? 'Harap isi deskripsi' : null,
               ),
               const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () {},
+
+              // 4. Komponen UI Pratinjau Gambar / Tombol Lampiran Dinamis
+              _selectedImage == null
+                  ? OutlinedButton.icon(
+                onPressed: _pickImage,
                 icon: const Icon(Icons.attach_file),
-                label: const Text('Lampirkan File / Gambar'),
+                label: const Text('Lampirkan Foto / Gambar'),
                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+              )
+                  : Card(
+                color: Colors.grey[100],
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          _selectedImage!,
+                          width: 70,
+                          height: 70,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _selectedImage!.path.split('/').last,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_forever, color: Colors.red),
+                        onPressed: _removeImage,
+                      )
+                    ],
+                  ),
+                ),
               ),
+
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _submitForm,

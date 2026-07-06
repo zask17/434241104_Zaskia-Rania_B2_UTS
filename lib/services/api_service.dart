@@ -6,17 +6,6 @@ class ApiService {
   // 1. Konfigurasi Endpoint & Anon Key Supabase
   static const String baseUrl = 'https://azgcylimfoggyiihpnib.supabase.co/rest/v1';
   static const String anonKey = 'sb_publishable_jvyp0o4ijJLjP0IQJRmkJQ__83qa3uf';
-  // ⚠️ TIDAK ADA SECRET / SERVICE ROLE KEY DI KODE CLIENT!
-  // Service role key hanya untuk backend/server. Di client cukup gunakan anon key.
-  //
-  // 🔑 Cara membuat ini bekerja:
-  // 1. Buka Supabase Dashboard → Authentication → Policies
-  // 2. Buat RLS Policy untuk tabel `users`:
-  //    - Policy "Allow insert for registration" → USING: true, WITH CHECK: true
-  //    - Policy "Allow select for login" → USING: true
-  // 3. Buat RLS Policy untuk tabel `tickets` dan `ticket_histories`:
-  //    - Allow all operations for anon users (atau sesuai kebutuhan)
-  // 4. Atau, nonaktifkan RLS di masing-masing tabel (hanya untuk development)
 
   /// Helper untuk mengenerate ID unik user dengan pola USR-XXXXXX
   static String generateUserId() {
@@ -33,12 +22,10 @@ class ApiService {
   }
 
   /// Header standar untuk Supabase PostgREST API.
-  /// Hanya menggunakan anon key — AMAN untuk kode client.
   Map<String, String> _getHeaders({String? userToken}) {
     return {
       'Content-Type': 'application/json',
       'apikey': anonKey,
-      // Gunakan anon key sebagai Bearer token (tanpa secret/service role key)
       'Authorization': 'Bearer ${userToken ?? anonKey}',
       'Prefer': 'return=representation',
     };
@@ -61,7 +48,6 @@ class ApiService {
   // ==================== REGISTER ====================
 
   /// Mendaftarkan user baru ke tabel `users` di Supabase.
-  /// Mengembalikan Map berisi {success: bool, message: String?, data: Map?}
   Future<Map<String, dynamic>> registerUser(Map<String, dynamic> userData) async {
     try {
       final response = await http.post(
@@ -79,7 +65,6 @@ class ApiService {
         };
       } else {
         final errorMsg = _parseErrorMessage(response);
-        // 409 = Conflict (email sudah terdaftar karena UNIQUE constraint)
         if (response.statusCode == 409) {
           return {
             'success': false,
@@ -89,8 +74,7 @@ class ApiService {
         if (response.statusCode == 401 || response.statusCode == 403) {
           return {
             'success': false,
-            'message': 'Akses ditolak oleh server. '
-                'Aktifkan RLS policy atau nonaktifkan RLS di Supabase Dashboard.',
+            'message': 'Akses ditolak oleh server. Aktifkan atau nonaktifkan RLS di Supabase Dashboard.',
           };
         }
         return {
@@ -110,7 +94,6 @@ class ApiService {
   // ==================== LOGIN ====================
 
   /// Login dengan mencocokkan email dan password di tabel `users`.
-  /// Mengembalikan Map berisi {success: bool, message: String?, data: Map?}
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       final uri = Uri.parse('$baseUrl/users').replace(queryParameters: {
@@ -140,8 +123,7 @@ class ApiService {
         if (response.statusCode == 401 || response.statusCode == 403) {
           return {
             'success': false,
-            'message': 'Akses ditolak oleh server. '
-                'Aktifkan RLS policy atau nonaktifkan RLS di Supabase Dashboard.',
+            'message': 'Akses ditolak oleh server. Aktifkan atau nonaktifkan RLS di Supabase Dashboard.',
           };
         }
         return {
@@ -250,7 +232,7 @@ class ApiService {
         headers: _getHeaders(),
         body: jsonEncode({
           'helpdesk_id': helpdeskId,
-          'status': 'inProgress', // ✅ Sesuai CHECK constraint: 'inProgress' (tanpa spasi)
+          'status': 'inProgress',
         }),
       );
 
@@ -288,14 +270,55 @@ class ApiService {
         headers: _getHeaders(),
         body: jsonEncode({
           'status': status,
-          'status_message': message,
         }),
       );
-
       return response.statusCode == 200;
     } catch (e) {
       print('Update Ticket Status Error: $e');
       return false;
     }
   }
-}
+
+  // ==================== COMMENTS ====================
+
+  /// Mengambil semua daftar komentar berdasarkan ID tiket tertentu
+  Future<List<dynamic>?> getTicketComments(String ticketId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ticket_comments?ticket_id=eq.$ticketId&order=created_at.asc'),
+        headers: _getHeaders(),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Fetch Comments Error: $e');
+      return null;
+    }
+  }
+
+  /// Mengirimkan komentar baru ke tabel database Supabase
+  Future<bool> createComment({
+    required String ticketId,
+    required String text,
+    required String userName,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/ticket_comments'),
+        headers: _getHeaders(),
+        body: jsonEncode({
+          'ticket_id': ticketId,
+          'comment_text': text,
+          'user_name': userName,
+          'created_at': DateTime.now().toIso8601String(),
+        }),
+      );
+      return response.statusCode == 201 || response.statusCode == 200;
+    } catch (e) {
+      print('Create Comment Error: $e');
+      return false;
+    }
+  }
+} // <--- Kurung kurawal penutup kelas ApiService sekarang ada di paling bawah!

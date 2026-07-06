@@ -1,4 +1,3 @@
-// import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../models/ticket.dart';
 import '../../models/user.dart';
@@ -19,15 +18,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   final ApiService _apiService = ApiService();
   bool _isLoading = false;
   List<dynamic> _ticketHistoryList = [];
+  List<dynamic> _ticketCommentList = [];
+  final TextEditingController _commentController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _currentTicket = widget.ticket;
-    _fetchTicketHistory(); // Ambil riwayat perjalanan tiket dari database API
+    _fetchTicketHistory();
+    _fetchTicketComments();
   }
 
-  // Mengambil data riwayat perjalanan tiket terbaru langsung dari API Supabase
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchTicketHistory() async {
     try {
       final response = await _apiService.getTicketHistory(_currentTicket.id);
@@ -37,67 +44,150 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         });
       }
     } catch (e) {
-      print('Error fetching history from API: $e');
+      debugPrint('Error fetching history from API: $e');
     }
   }
 
-  // ALUR 2 & 3: Proses Assign Helpdesk oleh Admin via API (Status otomatis berubah ke In Progress)
-  void _handleAssignHelpdesk() async {
-    // Simulasi ID helpdesk yang ditugaskan (bisa diintegrasikan dengan dropdown daftar petugas)
-    const String selectedHelpdeskId = "HD-09";
+  Future<void> _fetchTicketComments() async {
+    try {
+      final response = await _apiService.getTicketComments(_currentTicket.id);
+      if (response != null) {
+        setState(() {
+          _ticketCommentList = response;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching comments from API: $e');
+    }
+  }
 
-    setState(() => _isLoading = true);
+  void _handleSendComment() async {
+    final commentText = _commentController.text.trim();
+    if (commentText.isEmpty) return;
 
-    final success = await _apiService.assignTicketToHelpdesk(_currentTicket.id, selectedHelpdeskId);
+    final currentUserName = Session.currentUser?.name ?? 'User';
+
+    final success = await _apiService.createComment(
+      ticketId: _currentTicket.id,
+      text: commentText,
+      userName: currentUserName,
+    );
 
     if (success) {
-      // 1. Simpan log aktivitas ke database history via API
-      await _apiService.createHistoryLog(
-        ticketId: _currentTicket.id,
-        message: 'Tiket ditugaskan ke Helpdesk (Status: IN PROGRESS)',
-        userName: Session.currentUser?.name ?? 'Admin',
-      );
-
-      // 2. Perbarui state lokal tampilan agar sinkron dengan database
-      setState(() {
-        _currentTicket = _currentTicket.copyWith(status: TicketStatus.inProgress);
-      });
-
-      await _fetchTicketHistory(); // Refresh list tracking riwayat dari server
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Berhasil menugaskan helpdesk ke database!')));
+      _commentController.clear();
+      _fetchTicketComments();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal memperbarui data ke server.')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal mengirim komentar ke database.')),
+      );
     }
-
-    setState(() => _isLoading = false);
   }
 
-  // ALUR 4: Proses Finish oleh Helpdesk via API (Status otomatis berubah ke Closed)
+  // Aksi Admin: Mengubah status dari 'open' ke 'inProgress' dan menugaskan helpdesk
+  void _handleAssignToHelpdesk() async {
+    setState(() => _isLoading = true);
+    const String helpdeskStaffId = "2"; // Default ID Helpdesk Staff sesuai Seeder SQL
+
+    try {
+      final success = await _apiService.assignTicketToHelpdesk(_currentTicket.id, helpdeskStaffId);
+
+      if (success) {
+        await _apiService.createHistoryLog(
+          ticketId: _currentTicket.id,
+          message: 'Admin menugaskan tiket ke Helpdesk (Status: In Progress)',
+          userName: Session.currentUser?.name ?? 'Admin',
+        );
+
+        setState(() {
+          _currentTicket = _currentTicket.copyWith(
+            status: TicketStatus.inProgress,
+            helpdeskId: helpdeskStaffId,
+          );
+        });
+        await _fetchTicketHistory();
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tiket berhasil ditugaskan ke Helpdesk Staff!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal menugaskan tiket.'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error assigning ticket: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // Aksi Helpdesk: Mengubah status dari 'inProgress' ke 'resolved'
+  void _handleResolveTicket() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final success = await _apiService.updateTicketStatus(_currentTicket.id, TicketStatus.resolved.name, '');
+
+      if (success) {
+        await _apiService.createHistoryLog(
+          ticketId: _currentTicket.id,
+          message: 'Helpdesk menandai keluhan telah terselesaikan (Status: Resolved)',
+          userName: Session.currentUser?.name ?? 'Helpdesk',
+        );
+
+        setState(() {
+          _currentTicket = _currentTicket.copyWith(status: TicketStatus.resolved);
+        });
+        await _fetchTicketHistory();
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Status diperbarui menjadi RESOLVED.'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error resolving ticket: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // Aksi Helpdesk: Menutup tiket secara permanen ('closed')
   void _handleFinishTicket() async {
     setState(() => _isLoading = true);
 
     final success = await _apiService.finishTicket(_currentTicket.id);
 
     if (success) {
-      // 1. Simpan log aktivitas penutupan ke database history via API
       await _apiService.createHistoryLog(
         ticketId: _currentTicket.id,
-        message: 'Pekerjaan selesai, tiket ditutup (Status: CLOSED)',
+        message: 'Pekerjaan selesai, tiket ditutup permanen (Status: CLOSED)',
         userName: Session.currentUser?.name ?? 'Helpdesk',
       );
 
-      // 2. Perbarui state lokal tampilan
       setState(() {
         _currentTicket = _currentTicket.copyWith(status: TicketStatus.closed);
       });
 
-      await _fetchTicketHistory(); // Refresh list tracking riwayat dari server
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tiket resmi diselesaikan di database!')));
+      await _fetchTicketHistory();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tiket resmi diselesaikan dan dikunci di database!'), backgroundColor: Colors.grey),
+      );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal memproses penutupan tiket.')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal memproses penutupan tiket.'), backgroundColor: Colors.red),
+      );
     }
 
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override
@@ -105,6 +195,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     final user = Session.currentUser;
     final isAdmin = user?.role == UserRole.admin;
     final isHelpdesk = user?.role == UserRole.helpdesk;
+
+    final isOpen = _currentTicket.status == TicketStatus.open;
+    final isInProgress = _currentTicket.status == TicketStatus.inProgress;
+    final isResolved = _currentTicket.status == TicketStatus.resolved;
     final isClosed = _currentTicket.status == TicketStatus.closed;
 
     return Scaffold(
@@ -134,24 +228,71 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             Text('Deskripsi Masalah Keluhan', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(_currentTicket.description),
+            const SizedBox(height: 16),
+
+            // TAMPILKAN LAMPIRAN FOTO JIKA ADA
+            if (_currentTicket.attachments.isNotEmpty) ...[
+              Text('Lampiran File / Foto:', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _currentTicket.attachments.map((fileName) {
+                  return Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.insert_drive_file, color: Colors.blue, size: 18),
+                        const SizedBox(width: 6),
+                        Text(fileName, style: const TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
             const Divider(height: 32),
 
-            // AKSI TOMBOL BERDASARKAN ALUR DATABASE CLOUD (HILANG JIKA CLOSED)
+            // ALUR KONTROL STATUS (WORKFLOW DYNAMIC BUTTONS)
             if (!isClosed) ...[
-              if (isAdmin) ...[
+              // 1. Tombol khusus Admin jika tiket masih berstatus 'OPEN'
+              if (isAdmin && isOpen) ...[
                 ElevatedButton.icon(
-                  onPressed: _handleAssignHelpdesk,
+                  onPressed: _handleAssignToHelpdesk,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.assignment_ind),
+                  label: const Text('Assign ke Staff Helpdesk (Set In Progress)'),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // 2. Tombol khusus Helpdesk jika status sudah 'In Progress'
+              if (isHelpdesk && isInProgress) ...[
+                ElevatedButton.icon(
+                  onPressed: _handleResolveTicket,
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                   ),
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Assign Helpdesk & Mulai Kerja (In Progress)'),
+                  icon: const Icon(Icons.build_circle_outlined),
+                  label: const Text('Tandai Selesai Perbaikan (Set Resolved)'),
                 ),
                 const SizedBox(height: 16),
               ],
-              if (isHelpdesk && _currentTicket.status == TicketStatus.inProgress) ...[
+
+              // 3. Tombol khusus Helpdesk jika status sudah 'Resolved' menuju 'Closed'
+              if (isHelpdesk && isResolved) ...[
                 ElevatedButton.icon(
                   onPressed: _handleFinishTicket,
                   style: ElevatedButton.styleFrom(
@@ -160,12 +301,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     foregroundColor: Colors.white,
                   ),
                   icon: const Icon(Icons.check_circle_outline),
-                  label: const Text('Selesai / Finish Kerja (Set Close)'),
+                  label: const Text('Selesai / Finish Kerja (Set Close Tiket)'),
                 ),
                 const SizedBox(height: 16),
               ],
             ] else ...[
-              // ATURAN NO 5: Teks info mutlak jika status tiket sudah close
+              // Tampilan jika tiket sudah CLOSED (Kunci Semua Proses)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
@@ -175,7 +316,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   border: Border.all(color: Colors.grey.withOpacity(0.3)),
                 ),
                 child: const Text(
-                  'Tiket ini sudah ditutup (Closed). Tombol kontrol dinonaktifkan. Silakan membuat tiket keluhan baru jika ada kendala layanan lainnya.',
+                  'Tiket ini telah diselesaikan & ditutup (Closed). Sesi kontrol dihentikan.',
                   style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
@@ -186,7 +327,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             Text('Tracking / Riwayat Perjalanan Tiket (Live API)', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             _ticketHistoryList.isEmpty
-                ? const Text('Belum ada riwayat pelacakan untuk tiket ini.', style: TextStyle(color: Colors.grey))
+                ? const Text('Belum ada riwayat pelacakan.', style: TextStyle(color: Colors.grey))
                 : ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -220,8 +361,59 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 );
               },
             ),
-            const SizedBox(height: 24),
-            const TextField(decoration: InputDecoration(hintText: 'Tambahkan komentar...', border: OutlineInputBorder(), suffixIcon: Icon(Icons.send))),
+
+            const Divider(height: 32),
+            Text('Komentar Tiket Keluhan', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+
+            _ticketCommentList.isEmpty
+                ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8.0),
+              child: Text('Belum ada diskusi komentar.', style: TextStyle(color: Colors.grey)),
+            )
+                : ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _ticketCommentList.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final comment = _ticketCommentList[index];
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.grey.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(comment['user_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                          Text(
+                            comment['created_at'].toString().substring(0, 16).replaceAll('T', ' '),
+                            style: const TextStyle(color: Colors.grey, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(comment['comment_text'] ?? ''),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            TextField(
+              controller: _commentController,
+              decoration: InputDecoration(
+                hintText: 'Tambahkan komentar...',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.send, color: Colors.blue),
+                  onPressed: _handleSendComment,
+                ),
+              ),
+            ),
           ],
         ),
       ),

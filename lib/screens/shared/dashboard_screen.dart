@@ -69,18 +69,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
+
+      // CONTOH PENULISAN DI DALAM DASHBOARD_SCREEN.DART KAMU:
       floatingActionButton: (_selectedIndex == 1 && isUser)
           ? FloatingActionButton(
         onPressed: () async {
+          // Tunggu hasil return dari halaman CreateTicket
           final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const CreateTicketScreen()),
           );
-          if (result == true) setState(() {});
+          // 💡 JIKA RESULT TRUE, REFRESH HALAMAN UTAMA SECARA OTOMATIS
+          if (result == true) {
+            setState(() {});
+          }
         },
         child: const Icon(Icons.add),
       )
           : null,
+
+      // floatingActionButton: (_selectedIndex == 1 && isUser)
+      //     ? FloatingActionButton(
+      //   onPressed: () async {
+      //     final result = await Navigator.push(
+      //       context,
+      //       MaterialPageRoute(builder: (context) => const CreateTicketScreen()),
+      //     );
+      //     if (result == true) setState(() {});
+      //   },
+      //   child: const Icon(Icons.add),
+      // )
+      //     : null,
     );
   }
 }
