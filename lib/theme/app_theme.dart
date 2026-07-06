@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 class LaptopServiceTheme {
-  // Brand Color Palette untuk Servis Laptop
-  static const Color techDarkBackground = Color(0xFF121824); // Latar belakang gelap futuristik
-  static const Color techPrimary = Color(0xFF0F62FE);        // Biru siber presisi
-  static const Color repairAccent = Color(0xFFFF9900);       // Amber/Oranye mekanik/servis
-  static const Color surfaceLight = Color(0xFFF4F6F9);       // Latar terang bersih
-  static const Color surfaceDark = Color(0xFF1E2640);        // Card gelap
+  // Brand Color Palette untuk Servis Laptop Berwarna Kuning/Amber Mekanik
+  static const Color techDarkBackground = Color(0xFF121824);
+  static const Color techPrimary = Color(0xFFFF9900);
+  static const Color repairAccent = Color(0xFFFF9900);
+  static const Color surfaceLight = Color(0xFFF4F6F9);
+  static const Color surfaceDark = Color(0xFF1E2640);
 
   // 1. TEMA TERANG (Light Mode)
   static ThemeData get lightTheme {
@@ -25,16 +25,18 @@ class LaptopServiceTheme {
         secondary: repairAccent,
         surface: Colors.white,
       ),
-      // Styling Button Utama
+      // Mendorong indikator loading agar berwarna kuning tematik
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: techPrimary,
+      ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: repairAccent, // Tombol aksi utama berwarna oranye servis
+          backgroundColor: repairAccent,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           padding: const EdgeInsets.symmetric(vertical: 16),
         ),
       ),
-      // Styling Input Field Form
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
@@ -62,6 +64,10 @@ class LaptopServiceTheme {
         primary: techPrimary,
         secondary: repairAccent,
         surface: surfaceDark,
+      ),
+      // Mendorong indikator loading agar berwarna kuning tematik
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: techPrimary,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(

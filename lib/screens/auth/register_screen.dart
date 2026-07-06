@@ -109,7 +109,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Icon(Icons.person_add_outlined,
-                        size: 80, color: Colors.blue),
+                        size: 80, color: Colors.orange),
                     const SizedBox(height: 32),
                     TextFormField(
                       controller: _nameController,
@@ -205,7 +205,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       onPressed: _handleRegister,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Colors.blue,
+                        backgroundColor: Colors.orange,
                         foregroundColor: Colors.white,
                       ),
                       child: const Text('Register'),

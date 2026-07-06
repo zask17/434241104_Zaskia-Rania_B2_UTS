@@ -5,6 +5,7 @@ import 'profile_screen.dart';
 import 'ticket_detail_screen.dart';
 import 'notification_screen.dart';
 import '../../data/session.dart';
+import '../../data/theme_settings.dart';
 import '../../models/user.dart';
 import '../../models/ticket.dart';
 import '../../services/api_service.dart';
@@ -99,6 +100,9 @@ class _DashboardHomeState extends State<DashboardHome> {
   final ApiService _apiService = ApiService();
   late Future<List<Ticket>> _ticketsFuture;
 
+  // Simulasi penanda jika ada notifikasi baru yang belum dibuka dari database API
+  bool _hasUnreadNotification = true;
+
   @override
   void initState() {
     super.initState();
@@ -110,18 +114,48 @@ class _DashboardHomeState extends State<DashboardHome> {
     final user = Session.currentUser;
 
     return Scaffold(
-      // 🔔 KOREKSI INTEGRASI: Menambahkan tombol lonceng notifikasi ke dalam AppBar
       appBar: AppBar(
         title: const Text('Dashboard'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const NotificationScreen(),
-                ),
+          // Menggunakan ValueListenableBuilder untuk memantau status On/Off di pengaturan secara dinamis
+          ValueListenableBuilder<bool>(
+            valueListenable: ThemeSettings.isLaptopNotificationEnabled,
+            builder: (context, isNotificationOn, _) {
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    onPressed: () {
+                      setState(() {
+                        _hasUnreadNotification = false; // Hilangkan titik merah saat dibuka
+                      });
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  // Menampilkan badge titik merah hanya jika pengaturan AKTIF dan ada NOTIFIKASI BARU
+                  if (isNotificationOn && _hasUnreadNotification)
+                    Positioned(
+                      right: 12,
+                      top: 12,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 8,
+                          minHeight: 8,
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
           ),
@@ -159,11 +193,11 @@ class _DashboardHomeState extends State<DashboardHome> {
                 children: [
                   Text('Selamat Datang, ${user?.name ?? 'User'}!', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Text('Role: ${user?.role.name.toUpperCase()}', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                  Text('Role: ${user?.role.name.toUpperCase()}', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      Expanded(child: StatCard(title: 'Total Tiket', value: totalTickets.toString(), color: Colors.blue)),
+                      Expanded(child: StatCard(title: 'Total Tiket', value: totalTickets.toString(), color: Colors.orange)),
                       const SizedBox(width: 16),
                       Expanded(child: StatCard(title: 'Open / Baru', value: openTickets.toString(), color: Colors.cyan)),
                     ],

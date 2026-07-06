@@ -5,6 +5,7 @@ import '../auth/forgot_password_screen.dart';
 import '../../data/session.dart';
 import '../../services/api_service.dart';
 import '../../models/user.dart';
+import 'splash_screen.dart' show AppColors;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -65,103 +66,214 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] as String? ?? 'Login gagal'),
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFE0555C),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
     }
   }
 
+  InputDecoration _fieldDecoration({
+    required String label,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+    OutlineInputBorder border(Color color, double width) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: AppColors.textMuted),
+      filled: true,
+      fillColor: AppColors.surface,
+      prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
+      suffixIcon: suffixIcon,
+      contentPadding:
+      const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      border: border(AppColors.border, 1),
+      enabledBorder: border(AppColors.border, 1),
+      focusedBorder: border(AppColors.cyan, 1.6),
+      errorBorder: border(const Color(0xFFE0555C), 1.2),
+      focusedErrorBorder: border(const Color(0xFFE0555C), 1.6),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Form(
-                  key: _formKey,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 40),
-                        const Icon(Icons.lock_outline, size: 80, color: Colors.blue),
-                        const SizedBox(height: 32),
-                        Text(
-                          'Welcome Back',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 32),
-                        TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.email),
-                          ),
-                          validator: _validateEmail,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            border: const OutlineInputBorder(),
-                            prefixIcon: const Icon(Icons.lock),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                                color: Colors.grey,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.bgDeep, AppColors.bgElevated],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 24),
+                    // Device chip badge, echoing the splash signature
+                    Center(
+                      child: Container(
+                        width: 84,
+                        height: 84,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                              color: AppColors.border, width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.cyan.withOpacity(0.15),
+                              blurRadius: 24,
+                              spreadRadius: 1,
                             ),
-                          ),
-                          validator: (value) =>
-                              (value == null || value.isEmpty)
-                                  ? 'Harap masukkan password'
-                                  : null,
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const ForgotPasswordScreen(),
-                                ),
-                              );
-                            },
-                            child: const Text('Forgot Password?'),
+                        child: const Icon(
+                          Icons.laptop_mac_rounded,
+                          size: 40,
+                          color: AppColors.cyan,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Welcome back',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Sign in to track your repair status',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      style: const TextStyle(color: AppColors.textPrimary),
+                      cursorColor: AppColors.cyan,
+                      decoration: _fieldDecoration(
+                        label: 'Email',
+                        icon: Icons.alternate_email_rounded,
+                      ),
+                      validator: _validateEmail,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      style: const TextStyle(color: AppColors.textPrimary),
+                      cursorColor: AppColors.cyan,
+                      decoration: _fieldDecoration(
+                        label: 'Password',
+                        icon: Icons.lock_outline_rounded,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off_rounded
+                                : Icons.visibility_rounded,
+                            color: AppColors.textMuted,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                      ),
+                      validator: (value) => (value == null || value.isEmpty)
+                          ? 'Harap masukkan password'
+                          : null,
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.cyan,
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                              const ForgotPasswordScreen(),
+                            ),
+                          );
+                        },
+                        child: const Text('Forgot Password?'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleLogin,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.amber,
+                          disabledBackgroundColor:
+                          AppColors.amber.withOpacity(0.5),
+                          foregroundColor: AppColors.bgDeep,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        ElevatedButton(
-                          onPressed: _handleLogin,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
+                        child: _isLoading
+                            ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: AppColors.bgDeep,
                           ),
-                          child: const Text('Login'),
+                        )
+                            : const Text(
+                          'Login',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Don't have an account?",
+                          style: TextStyle(color: AppColors.textMuted),
                         ),
                         TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.cyan,
+                          ),
                           onPressed: () {
                             Navigator.push(
                               context,
@@ -170,14 +282,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             );
                           },
-                          child: const Text(
-                              'Don\'t have an account? Register'),
+                          child: const Text('Register'),
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
+            ),
+          ),
+        ),
       ),
     );
   }

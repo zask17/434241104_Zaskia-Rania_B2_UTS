@@ -18,7 +18,7 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 32),
           const CircleAvatar(
             radius: 50,
-            backgroundColor: Colors.blue,
+            backgroundColor: Colors.orange,
             child: Icon(Icons.person, size: 50, color: Colors.white),
           ),
           const SizedBox(height: 16),
@@ -26,7 +26,7 @@ class ProfileScreen extends StatelessWidget {
           Text(user?.email ?? '-', style: const TextStyle(color: Colors.grey)),
           Text(
             'Role: ${user?.role.name.toUpperCase()}',
-            style: const TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold),
+            style: const TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 32),
           const Divider(),

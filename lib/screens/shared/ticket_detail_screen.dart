@@ -240,7 +240,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
                       )
                           : kIsWeb
-                          ? const Center(child: Icon(Icons.insert_drive_file, color: Colors.blue))
+                          ? const Center(child: Icon(Icons.insert_drive_file, color: Colors.orange))
                           : Image.file(
                         File(fileSource),
                         fit: BoxFit.cover,
@@ -319,9 +319,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     children: [
                       Column(
                         children: [
-                          const Icon(Icons.check_circle, color: Colors.blue, size: 20),
+                          const Icon(Icons.check_circle, color: Colors.orange, size: 20),
                           if (index != _ticketHistoryList.length - 1)
-                            Container(width: 2, height: 40, color: Colors.blue.withValues(alpha: 0.3)),
+                            Container(width: 2, height: 40, color: Colors.orange.withValues(alpha: 0.3)),
                         ],
                       ),
                       const SizedBox(width: 12),
@@ -363,9 +363,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   padding: const EdgeInsets.all(12),
                   margin: isReply ? const EdgeInsets.only(left: 24) : EdgeInsets.zero,
                   decoration: BoxDecoration(
-                    color: isReply ? Colors.blue.withValues(alpha: 0.02) : Colors.grey.withValues(alpha: 0.05),
+                    color: isReply ? Colors.orange.withValues(alpha: 0.02) : Colors.grey.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(8),
-                    border: isReply ? Border.all(color: Colors.blue.withValues(alpha: 0.1)) : null,
+                    border: isReply ? Border.all(color: Colors.orange.withValues(alpha: 0.1)) : null,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -373,7 +373,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(comment['user_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                          Text(comment['user_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
                           Text(
                             comment['created_at'].toString().substring(0, 16).replaceAll('T', ' '),
                             style: const TextStyle(color: Colors.grey, fontSize: 11),
@@ -425,7 +425,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 hintText: _replyToUser != null ? 'Tulis balasan...' : 'Tambahkan komentar...',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.send, color: Colors.blue),
+                  icon: const Icon(Icons.send, color: Colors.orange),
                   onPressed: _handleSendComment,
                 ),
               ),
