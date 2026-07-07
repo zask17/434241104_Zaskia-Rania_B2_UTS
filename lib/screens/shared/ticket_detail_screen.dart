@@ -109,6 +109,20 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     if (mounted) setState(() => _isLoading = false);
   }
 
+  // Helper widget untuk menangani rendering gambar error/corrupt secara konsisten
+  Widget _buildErrorImage(Color color) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.broken_image_rounded, color: color, size: 28),
+          const SizedBox(height: 4),
+          Text('Gagal memuat', style: TextStyle(fontSize: 10, color: color)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Session.currentUser;
@@ -181,16 +195,19 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       Text(_currentTicket.description, style: TextStyle(color: dynamicTextPrimary, height: 1.4)),
 
                       // ====================================================================
-                      // 📸 AREA LAMPIRAN FOTO KENDALA ADAPTIF BASE64 & NETWORK URL
+                      // 萄 AREA LAMPIRAN FOTO KENDALA ADAPTIF BASE64 & NETWORK URL (FIXED)
                       // ====================================================================
                       if (_currentTicket.attachments.isNotEmpty) ...[
                         const Divider(height: 24),
-                        Text('Lampiran Foto Kendala:', style: TextStyle(fontWeight: FontWeight.bold, color: dynamicTextPrimary, fontSize: 13)),
+                        Text('Lampiran File/Foto Kendala:', style: TextStyle(fontWeight: FontWeight.bold, color: dynamicTextPrimary, fontSize: 13)),
                         const SizedBox(height: 10),
                         Wrap(
                           spacing: 12,
                           runSpacing: 12,
                           children: _currentTicket.attachments.map((fileSource) {
+                            // Validasi jika string kosong atau tidak valid
+                            if (fileSource.trim().isEmpty) return const SizedBox.shrink();
+
                             return Container(
                               width: 120,
                               height: 120,
@@ -202,25 +219,38 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                 borderRadius: BorderRadius.circular(10),
                                 child: Builder(
                                   builder: (context) {
-                                    if (fileSource.startsWith('http')) {
+                                    // 1. Cek apakah ini format Base64 Data URI
+                                    if (fileSource.startsWith('data:image')) {
+                                      try {
+                                        final base64Content = fileSource.split(',').last;
+                                        return Image.memory(
+                                          base64Decode(base64Content),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => _buildErrorImage(dynamicTextMuted),
+                                        );
+                                      } catch (e) {
+                                        return _buildErrorImage(dynamicTextMuted);
+                                      }
+                                    }
+                                    // 2. Cek apakah ini URL Internet / Supabase Storage
+                                    else if (fileSource.startsWith('http://') || fileSource.startsWith('https://')) {
                                       return Image.network(
                                         fileSource,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Center(child: Icon(Icons.broken_image_rounded, color: dynamicTextMuted)),
+                                        errorBuilder: (_, __, ___) => _buildErrorImage(dynamicTextMuted),
                                       );
-                                    } else if (fileSource.startsWith('data:image')) {
-                                      final base64Content = fileSource.split(',').last;
-                                      return Image.memory(
-                                        base64Decode(base64Content),
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Center(child: Icon(Icons.broken_image_rounded, color: dynamicTextMuted)),
-                                      );
-                                    } else {
-                                      return Image.file(
-                                        File(fileSource),
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Center(child: Icon(Icons.broken_image_rounded, color: dynamicTextMuted)),
-                                      );
+                                    }
+                                    // 3. Fallback aman untuk sisa data / path lokal lama
+                                    else {
+                                      try {
+                                        return Image.file(
+                                          File(fileSource),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => _buildErrorImage(dynamicTextMuted),
+                                        );
+                                      } catch (e) {
+                                        return _buildErrorImage(dynamicTextMuted);
+                                      }
                                     }
                                   },
                                 ),

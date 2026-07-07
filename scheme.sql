@@ -1,69 +1,3 @@
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
-
-CREATE TABLE public.roles (
-  id integer NOT NULL DEFAULT nextval('roles_id_seq'::regclass),
-  role_name text NOT NULL UNIQUE,
-  CONSTRAINT roles_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.users (
-  id text NOT NULL,
-  name text NOT NULL,
-  email text NOT NULL UNIQUE,
-  password text NOT NULL,
-  role_id integer NOT NULL,
-  CONSTRAINT users_pkey PRIMARY KEY (id),
-  CONSTRAINT fk_user_role FOREIGN KEY (role_id) REFERENCES public.roles(id)
-);
-CREATE TABLE public.tickets (
-  id text NOT NULL,
-  title text NOT NULL,
-  description text NOT NULL,
-  status text NOT NULL DEFAULT 'open'::text CHECK (status = ANY (ARRAY['open'::text, 'inProgress'::text, 'closed'::text])),
-  priority text NOT NULL CHECK (priority = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text])),
-  category text NOT NULL,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  creator_id text NOT NULL,
-  creator_name text NOT NULL,
-  attachments ARRAY DEFAULT '{}'::text[],
-  helpdesk_id text,
-  finished_at timestamp with time zone,
-  CONSTRAINT tickets_pkey PRIMARY KEY (id),
-  CONSTRAINT tickets_helpdesk_id_fkey FOREIGN KEY (helpdesk_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.ticket_histories (
-  id bigint NOT NULL DEFAULT nextval('ticket_histories_id_seq'::regclass),
-  ticket_id text,
-  message text NOT NULL,
-  user_name text NOT NULL,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT ticket_histories_pkey PRIMARY KEY (id),
-  CONSTRAINT ticket_histories_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.tickets(id)
-);
-CREATE TABLE public.ticket_comments (
-  id bigint NOT NULL DEFAULT nextval('ticket_comments_id_seq'::regclass),
-  ticket_id text,
-  comment_text text NOT NULL,
-  user_name text NOT NULL,
-  reply_to_user text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT ticket_comments_pkey PRIMARY KEY (id),
-  CONSTRAINT ticket_comments_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.tickets(id)
-);
-CREATE TABLE public.notifications (
-  id bigint NOT NULL DEFAULT nextval('notifications_id_seq'::regclass),
-  ticket_id text NOT NULL,
-  title text NOT NULL,
-  description text NOT NULL,
-  target_role_id integer NOT NULL,
-  target_user_id text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT notifications_pkey PRIMARY KEY (id)
-);
-
-
-
-
 -- ==========================================
 -- DDL TABEL
 -- ==========================================
@@ -177,8 +111,8 @@ CREATE POLICY "Allow read tickets based on owner or staff" ON tickets FOR SELECT
     EXISTS (SELECT 1 FROM users WHERE id = users.id AND (role_id = 1 OR role_id = 2))
 );
 
-CREATE POLICY "Allow insert for authenticated creators" ON tickets FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM users WHERE users.id = creator_id));
+CREATE POLICY "Allow insert for all authenticated users" ON tickets
+    FOR INSERT  WITH CHECK (true);
 CREATE POLICY "Allow update for tickets for admin or helpdesk" ON tickets FOR UPDATE USING (
     EXISTS (SELECT 1 FROM users WHERE id = users.id AND (role_id = 1 OR role_id = 2))
 );
