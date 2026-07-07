@@ -13,22 +13,18 @@ class ApiService {
     int nextSequence = 1;
 
     try {
-      // Query ke Supabase untuk mengambil semua data user guna menghitung jumlah totalnya
       final uri = Uri.parse('$baseUrl/users?select=id');
       final response = await http.get(uri, headers: _getHeaders());
 
       if (response.statusCode == 200) {
         final List<dynamic> allUsers = jsonDecode(response.body);
-        // Nomor urut berikutnya adalah total user terdaftar saat ini + 1
         nextSequence = allUsers.length + 1;
       }
     } catch (e) {
       print('Error counting total users: $e');
-      // Fallback cadangan acak 8 digit jika koneksi internet mendadak putus/gagal
       nextSequence = 10000000 + Random().nextInt(89999999);
     }
 
-    // Format urutan menjadi 8 digit dengan padLeft (Contoh: 1 -> 00000001)
     final sequenceStr = nextSequence.toString().padLeft(8, '0');
 
     return 'USR-$sequenceStr';
@@ -38,29 +34,25 @@ class ApiService {
   Future<String> generateTicketId() async {
     final now = DateTime.now();
 
-    // Format tanggal untuk ID: YYMMDD (Dua digit terakhir tahun, bulan, hari)
     final yy = now.year.toString().substring(2);
     final mm = now.month.toString().padLeft(2, '0');
     final dd = now.day.toString().padLeft(2, '0');
     final datePattern = '$yy$mm$dd'; // Contoh: 260707
 
-    // Format ISO awal hari ini untuk filter di database (YYYY-MM-DD)
     final todayStart = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}T00:00:00.000Z";
 
     int nextSequence = 1;
 
     try {
-      // Query ke Supabase untuk menghitung jumlah tiket yang dibuat sejak awal hari ini
       final uri = Uri.parse('$baseUrl/tickets').replace(queryParameters: {
         'created_at': 'gte.$todayStart',
-        'select': 'id', // Cukup ambil ID saja untuk menghemat bandwidth
+        'select': 'id',
       });
 
       final response = await http.get(uri, headers: _getHeaders());
 
       if (response.statusCode == 200) {
         final List<dynamic> ticketsToday = jsonDecode(response.body);
-        // Urutan berikutnya adalah jumlah tiket hari ini + 1
         nextSequence = ticketsToday.length + 1;
       }
     } catch (e) {
@@ -68,7 +60,6 @@ class ApiService {
       nextSequence = 100 + Random().nextInt(899);
     }
 
-    // Pad angka urutan menjadi 3 digit (Contoh: 1 -> 001, 12 -> 012)
     final sequenceStr = nextSequence.toString().padLeft(3, '0');
 
     return 'TKT-$datePattern$sequenceStr';

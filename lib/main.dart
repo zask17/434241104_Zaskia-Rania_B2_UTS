@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/auth/splash_screen.dart';
 import 'theme/app_theme.dart';
-import 'data/theme_settings.dart'; // ✅ Komentar dibuka agar tidak error
+import 'data/theme_settings.dart';
 
 void main() {
   runApp(const MyApp());

@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:convert'; // Diperlukan untuk enkripsi Base64
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../data/session.dart';
@@ -63,19 +63,17 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSubmitting = true);
 
-      // 💡 KOREKSI: Tambahkan 'await' karena ID sekarang dicek langsung ke Live Database
       final String uniqueTicketId = await _apiService.generateTicketId();
 
       List<String> attachmentsList = [];
 
-      // Konversi bytes gambar menjadi format Base64 standard URI scheme
       if (_webImageBytes != null) {
         String base64Image = base64Encode(_webImageBytes!).replaceAll('\n', '').replaceAll('\r', '');
         attachmentsList.add("data:image/png;base64,$base64Image");
       }
 
       final Map<String, dynamic> ticketPayload = {
-        'id': uniqueTicketId, // ID berurutan hasil query (Contoh: TKT-260707001)
+        'id': uniqueTicketId,
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
         'priority': _selectedPriority?.toLowerCase() ?? 'medium',

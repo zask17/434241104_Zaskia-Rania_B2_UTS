@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 class LaptopServiceTheme {
-  // Brand Color Palette untuk Servis Laptop Berwarna Kuning/Amber Mekanik
   static const Color techDarkBackground = Color(0xFF121824);
   static const Color techPrimary = Color(0xFFFF9900);
   static const Color repairAccent = Color(0xFFFF9900);
@@ -25,7 +24,6 @@ class LaptopServiceTheme {
         secondary: repairAccent,
         surface: Colors.white,
       ),
-      // Mendorong indikator loading agar berwarna kuning tematik
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: techPrimary,
       ),
@@ -65,7 +63,6 @@ class LaptopServiceTheme {
         secondary: repairAccent,
         surface: surfaceDark,
       ),
-      // Mendorong indikator loading agar berwarna kuning tematik
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: techPrimary,
       ),
