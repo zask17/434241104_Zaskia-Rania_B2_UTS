@@ -1,10 +1,7 @@
 import 'dart:io';
 import 'dart:convert'; // Diperlukan untuk enkripsi Base64
 import 'package:flutter/material.dart';
-
-// 🔥 KOREKSI DI SINI: Berikan alias 'fp' agar tidak bentrok dengan scope global Web
-import 'package:file_picker/file_picker.dart' as fp;
-
+import 'package:image_picker/image_picker.dart';
 import '../../data/session.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:typed_data';
@@ -27,39 +24,38 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
   String? _selectedPriority;
   bool _isSubmitting = false;
 
-  String? _fileName;             // Menyimpan nama berkas dokumen/foto
-  Uint8List? _fileBytes;         // Menyimpan data biner berkas
-  String? _fileExtension;        // Ekstensi berkas untuk pratinjau tipe
+  File? _selectedImage;          // Untuk Mobile path tracking
+  Uint8List? _webImageBytes;     // Untuk menyimpan bytes gambar
+  final ImagePicker _picker = ImagePicker();
 
-  Future<void> _pickFile() async {
+  Future<void> _pickImage() async {
     try {
-      // 🔥 KOREKSI DI SINI: Gunakan alias fp.FilePicker
-      fp.FilePickerResult? result = await fp.FilePicker.platform.pickFiles(
-        withData: true, // Sangat penting agar bytes terbaca di semua platform (Web & Mobile)
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
       );
 
-      if (result != null && result.files.isNotEmpty) {
-        final pickedFile = result.files.first;
+      if (pickedFile != null) {
+        // Ambil bytes data gambar agar support di Web maupun Mobile
+        final bytes = await pickedFile.readAsBytes();
         setState(() {
-          _fileName = pickedFile.name;
-          _fileBytes = pickedFile.bytes;
-          _fileExtension = pickedFile.extension?.toLowerCase();
+          _webImageBytes = bytes;
+          _selectedImage = File(pickedFile.name); // Simpan referensi nama objek
         });
       }
     } catch (e) {
-      debugPrint('Error picking file: $e');
+      debugPrint('Error picking image: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal mengambil file.')),
+        const SnackBar(content: Text('Gagal mengambil gambar.')),
       );
     }
   }
 
-  void _removeFile() {
+  void _removeImage() {
     setState(() {
-      _fileName = null;
-      _fileBytes = null;
-      _fileExtension = null;
+      _selectedImage = null;
+      _webImageBytes = null;
     });
   }
 
@@ -67,34 +63,26 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSubmitting = true);
 
+      // 💡 KOREKSI: Tambahkan 'await' karena ID sekarang dicek langsung ke Live Database
       final String uniqueTicketId = await _apiService.generateTicketId();
-      String? attachmentString;
 
-      // Konversi berkas menjadi biner Base64 dengan header tipe dinamis
-      if (_fileBytes != null && _fileName != null) {
-        String base64Data = base64Encode(_fileBytes!);
+      List<String> attachmentsList = [];
 
-        // Deteksi header MIME type sederhana berdasarkan ekstensi berkas
-        String mimeHeader = "data:application/octet-stream";
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(_fileExtension)) {
-          mimeHeader = "data:image/png"; // Dianggap gambar
-        } else if (_fileExtension == 'pdf') {
-          mimeHeader = "data:application/pdf";
-        }
-
-        // Hasil string tunggal: data:image/png;base64,iVBORw0KG...
-        attachmentString = "$mimeHeader;base64,$base64Data";
+      // Konversi bytes gambar menjadi format Base64 standard URI scheme
+      if (_webImageBytes != null) {
+        String base64Image = base64Encode(_webImageBytes!).replaceAll('\n', '').replaceAll('\r', '');
+        attachmentsList.add("data:image/png;base64,$base64Image");
       }
 
       final Map<String, dynamic> ticketPayload = {
-        'id': uniqueTicketId,
+        'id': uniqueTicketId, // ID berurutan hasil query (Contoh: TKT-260707001)
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
         'priority': _selectedPriority?.toLowerCase() ?? 'medium',
         'category': _selectedCategory ?? 'General',
         'creator_id': Session.currentUser?.id ?? '3',
-        'creator_name': Session.currentUser?.name ?? 'Anonymous User',
-        'attachment_url': attachmentString,
+        'creator_name': Session.currentUser?.name ?? 'Regular User',
+        'attachments': attachmentsList,
       };
 
       final bool ticketCreated = await _apiService.createTicket(ticketPayload);
@@ -102,19 +90,27 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
       if (ticketCreated) {
         await _apiService.createHistoryLog(
           ticketId: uniqueTicketId,
-          message: 'Tiket berhasil dibuat dengan lampiran berkas (Status: OPEN)',
-          userName: Session.currentUser?.name ?? 'System',
+          message: 'Tiket berhasil dibuat dengan lampiran (Status: OPEN)',
+          userName: Session.currentUser?.name ?? 'Regular User',
         );
 
         if (!mounted) return;
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tiket berhasil disimpan!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Tiket berhasil disimpan!'),
+            backgroundColor: Colors.green,
+          ),
         );
+
         Navigator.pop(context, true);
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal menyimpan tiket ke server database.'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('Gagal menyimpan tiket ke server database.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
 
@@ -124,8 +120,6 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(_fileExtension);
-
     return Scaffold(
       appBar: AppBar(title: const Text('Buat Tiket Baru')),
       body: _isSubmitting
@@ -139,7 +133,10 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
             children: [
               TextFormField(
                 controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Judul Keluhan', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'Judul Keluhan',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) => (value == null || value.isEmpty) ? 'Harap isi judul' : null,
               ),
               const SizedBox(height: 16),
@@ -164,16 +161,20 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
               TextFormField(
                 controller: _descriptionController,
                 maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Deskripsi Masalah', border: OutlineInputBorder(), alignLabelWithHint: true),
+                decoration: const InputDecoration(
+                  labelText: 'Deskripsi Masalah',
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
                 validator: (value) => (value == null || value.isEmpty) ? 'Harap isi deskripsi' : null,
               ),
               const SizedBox(height: 16),
 
-              _fileBytes == null
+              _webImageBytes == null
                   ? OutlinedButton.icon(
-                onPressed: _pickFile,
-                icon: const Icon(Icons.upload_file_rounded),
-                label: const Text('Lampirkan File Dokumen / Foto'),
+                onPressed: _pickImage,
+                icon: const Icon(Icons.attach_file),
+                label: const Text('Lampirkan Foto / Gambar'),
                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
               )
                   : Card(
@@ -184,25 +185,25 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: isImage
-                            ? Image.memory(_fileBytes!, width: 70, height: 70, fit: BoxFit.cover)
-                            : Container(
-                          width: 70, height: 70, color: Colors.orange.withOpacity(0.1),
-                          child: const Icon(Icons.insert_drive_file_rounded, color: Colors.orange, size: 36),
+                        child: Image.memory(
+                          _webImageBytes!,
+                          width: 70,
+                          height: 70,
+                          fit: BoxFit.cover,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          _fileName ?? 'Berkas Terlampir',
+                          _selectedImage?.path ?? 'image.png',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 14, color: Colors.black87),
+                          style: const TextStyle(fontSize: 14),
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_forever, color: Colors.red),
-                        onPressed: _removeFile,
+                        onPressed: _removeImage,
                       )
                     ],
                   ),
