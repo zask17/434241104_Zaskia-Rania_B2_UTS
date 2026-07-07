@@ -41,9 +41,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
 
       setState(() => _isLoading = true);
-      final String uniqueUserId = ApiService.generateUserId();
+
+      final String uniqueUserId = await _apiService.generateUserId();
+
       final Map<String, dynamic> userPayload = {
-        'id': uniqueUserId,
+        'id': uniqueUserId, // Hasil format urutan baru (Contoh: USR-00000004)
         'name': _nameController.text.trim(),
         'email': _emailController.text.trim().toLowerCase(),
         'password': _passwordController.text.trim(),

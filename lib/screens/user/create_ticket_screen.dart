@@ -1,6 +1,7 @@
 import 'dart:io';
+import 'dart:convert'; // Diperlukan untuk enkripsi Base64
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // Tambahkan package image_picker
+import 'package:image_picker/image_picker.dart';
 import '../../data/session.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:typed_data';
@@ -23,12 +24,10 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
   String? _selectedPriority;
   bool _isSubmitting = false;
 
-  // 1. Variabel untuk menyimpan file gambar yang dipilih
-  File? _selectedImage;          // Untuk mobile
-  Uint8List? _webImageBytes;     // Tambahkan ini untuk menampung bytes gambar di Web
+  File? _selectedImage;          // Untuk Mobile path tracking
+  Uint8List? _webImageBytes;     // Untuk menyimpan bytes gambar
   final ImagePicker _picker = ImagePicker();
 
-  // 2. Fungsi untuk mengambil gambar dari galeri
   Future<void> _pickImage() async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
@@ -37,20 +36,12 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
       );
 
       if (pickedFile != null) {
-        if (kIsWeb) {
-          // Jika berjalan di Web, baca gambar sebagai Bytes
-          final bytes = await pickedFile.readAsBytes();
-          setState(() {
-            _webImageBytes = bytes;
-            // Kita pakai nama file tiruan/asli untuk pelengkap payload nanti
-            _selectedImage = File(pickedFile.name);
-          });
-        } else {
-          // Jika berjalan di Mobile (Android/iOS)
-          setState(() {
-            _selectedImage = File(pickedFile.path);
-          });
-        }
+        // Ambil bytes data gambar agar support di Web maupun Mobile
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _webImageBytes = bytes;
+          _selectedImage = File(pickedFile.name); // Simpan referensi nama objek
+        });
       }
     } catch (e) {
       debugPrint('Error picking image: $e');
@@ -61,11 +52,10 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
     }
   }
 
-  // 4. Perbarui juga fungsi _removeImage kamu:
   void _removeImage() {
     setState(() {
       _selectedImage = null;
-      _webImageBytes = null; // Reset bytes web
+      _webImageBytes = null;
     });
   }
 
@@ -73,15 +63,19 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSubmitting = true);
 
-      final String uniqueTicketId = ApiService.generateTicketId();
+      // 💡 KOREKSI: Tambahkan 'await' karena ID sekarang dicek langsung ke Live Database
+      final String uniqueTicketId = await _apiService.generateTicketId();
+
       List<String> attachmentsList = [];
 
-      if (_selectedImage != null) {
-        attachmentsList.add(_selectedImage!.path.split('/').last);
+      // Konversi bytes gambar menjadi format Base64 standard URI scheme
+      if (_webImageBytes != null) {
+        String base64Image = base64Encode(_webImageBytes!);
+        attachmentsList.add("data:image/png;base64,$base64Image");
       }
 
       final Map<String, dynamic> ticketPayload = {
-        'id': uniqueTicketId,
+        'id': uniqueTicketId, // ID berurutan hasil query (Contoh: TKT-260707001)
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
         'priority': _selectedPriority?.toLowerCase() ?? 'medium',
@@ -176,8 +170,7 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
               ),
               const SizedBox(height: 16),
 
-              // 4. Komponen UI Pratinjau Gambar / Tombol Lampiran Dinamis
-              _selectedImage == null
+              _webImageBytes == null
                   ? OutlinedButton.icon(
                 onPressed: _pickImage,
                 icon: const Icon(Icons.attach_file),
@@ -192,15 +185,8 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: kIsWeb
-                            ? Image.memory(
-                          _webImageBytes!, // Menampilkan dari memori bytes jika di Web
-                          width: 70,
-                          height: 70,
-                          fit: BoxFit.cover,
-                        )
-                            : Image.file(
-                          _selectedImage!, // Menampilkan dari file path jika di Mobile
+                        child: Image.memory(
+                          _webImageBytes!,
                           width: 70,
                           height: 70,
                           fit: BoxFit.cover,
@@ -209,7 +195,7 @@ class _CreateTicketScreenState extends State<CreateTicketScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          _selectedImage!.path.split('/').last,
+                          _selectedImage?.path ?? 'image.png',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 14),

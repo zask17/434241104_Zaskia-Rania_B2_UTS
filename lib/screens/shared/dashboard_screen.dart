@@ -9,6 +9,7 @@ import '../../data/theme_settings.dart';
 import '../../models/user.dart';
 import '../../models/ticket.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart' show AppColors;
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -52,39 +53,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = Session.currentUser;
     final isUser = user?.role == UserRole.user;
 
-    return Scaffold(
-      body: _getSelectedScreen(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-            _selectedTicketForDetail = null;
-          });
-        },
-        items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.list_alt),
-            label: isUser ? 'Tiket Saya' : 'Semua Tiket',
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeSettings.themeMode,
+      builder: (context, currentMode, _) {
+        final isDark = currentMode == ThemeMode.dark ||
+            (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+
+        final dynamicNavBg = isDark ? AppColors.bgElevated : Colors.white;
+        final dynamicUnselected = isDark ? AppColors.textMuted : const Color(0xFF64748B);
+
+        return Scaffold(
+          body: _getSelectedScreen(),
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: isDark ? AppColors.border : const Color(0xFFCBD5E1), width: 0.8)),
+            ),
+            child: BottomNavigationBar(
+              backgroundColor: dynamicNavBg,
+              currentIndex: _selectedIndex,
+              selectedItemColor: AppColors.amber,
+              unselectedItemColor: dynamicUnselected,
+              elevation: 0,
+              onTap: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                  _selectedTicketForDetail = null;
+                });
+              },
+              items: [
+                const BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
+                BottomNavigationBarItem(
+                  icon: const Icon(Icons.confirmation_number_rounded),
+                  label: isUser ? 'Tiket Saya' : 'Semua Tiket',
+                ),
+                const BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
+              ],
+            ),
           ),
-          const BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
-      ),
-      floatingActionButton: (_selectedIndex == 1 && isUser)
-          ? FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CreateTicketScreen()),
-          );
-          if (result == true) {
-            setState(() {});
-          }
-        },
-        child: const Icon(Icons.add),
-      )
-          : null,
+          floatingActionButton: (_selectedIndex == 1 && isUser)
+              ? FloatingActionButton(
+            backgroundColor: AppColors.amber,
+            foregroundColor: const Color(0xFF121824),
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CreateTicketScreen()),
+              );
+              if (result == true) {
+                setState(() {});
+              }
+            },
+            child: const Icon(Icons.add_rounded, size: 28),
+          )
+              : null,
+        );
+      },
     );
   }
 }
@@ -99,8 +124,6 @@ class DashboardHome extends StatefulWidget {
 class _DashboardHomeState extends State<DashboardHome> {
   final ApiService _apiService = ApiService();
   late Future<List<Ticket>> _ticketsFuture;
-
-  // Simulasi penanda jika ada notifikasi baru yang belum dibuka dari database API
   bool _hasUnreadNotification = true;
 
   @override
@@ -113,128 +136,181 @@ class _DashboardHomeState extends State<DashboardHome> {
   Widget build(BuildContext context) {
     final user = Session.currentUser;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        actions: [
-          // Menggunakan ValueListenableBuilder untuk memantau status On/Off di pengaturan secara dinamis
-          ValueListenableBuilder<bool>(
-            valueListenable: ThemeSettings.isLaptopNotificationEnabled,
-            builder: (context, isNotificationOn, _) {
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_outlined),
-                    onPressed: () {
-                      setState(() {
-                        _hasUnreadNotification = false; // Hilangkan titik merah saat dibuka
-                      });
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const NotificationScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  // Menampilkan badge titik merah hanya jika pengaturan AKTIF dan ada NOTIFIKASI BARU
-                  if (isNotificationOn && _hasUnreadNotification)
-                    Positioned(
-                      right: 12,
-                      top: 12,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 8,
-                          minHeight: 8,
-                        ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeSettings.themeMode,
+      builder: (context, currentMode, _) {
+        final isDark = currentMode == ThemeMode.dark ||
+            (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+
+        final dynamicBgDeep = isDark ? AppColors.bgDeep : const Color(0xFFF4F6F9);
+        final dynamicBgElevated = isDark ? AppColors.bgElevated : const Color(0xFFE2E8F0);
+        final dynamicSurface = isDark ? AppColors.surface : Colors.white;
+        final dynamicBorder = isDark ? AppColors.border : const Color(0xFFCBD5E1);
+        final dynamicTextPrimary = isDark ? AppColors.textPrimary : const Color(0xFF0F172A);
+        final dynamicTextMuted = isDark ? AppColors.textMuted : const Color(0xFF64748B);
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Dashboard Overview', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.transparent,
+            foregroundColor: dynamicTextPrimary,
+            elevation: 0,
+            actions: [
+              ValueListenableBuilder<bool>(
+                valueListenable: ThemeSettings.isLaptopNotificationEnabled,
+                builder: (context, isNotificationOn, _) {
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.notifications_outlined, color: dynamicTextPrimary),
+                        onPressed: () {
+                          setState(() {
+                            _hasUnreadNotification = false;
+                          });
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                          );
+                        },
                       ),
-                    ),
-                ],
-              );
-            },
+                      if (isNotificationOn && _hasUnreadNotification)
+                        Positioned(
+                          right: 12,
+                          top: 12,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(color: Color(0xFFE0555C), shape: BoxShape.circle),
+                            constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
-      body: FutureBuilder<List<Ticket>>(
-        future: _ticketsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          List<Ticket> allTickets = snapshot.data ?? [];
-
-          if (user?.role == UserRole.user) {
-            allTickets = allTickets.where((t) => t.creatorId == user!.id).toList();
-          }
-
-          final totalTickets = allTickets.length;
-          final openTickets = allTickets.where((t) => t.status == TicketStatus.open).length;
-          final inProgressTickets = allTickets.where((t) => t.status == TicketStatus.inProgress).length;
-          final closedTickets = allTickets.where((t) => t.status == TicketStatus.closed).length;
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              setState(() {
-                _ticketsFuture = _apiService.getTickets();
-              });
-            },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Selamat Datang, ${user?.name ?? 'User'}!', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text('Role: ${user?.role.name.toUpperCase()}', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(child: StatCard(title: 'Total Tiket', value: totalTickets.toString(), color: Colors.orange)),
-                      const SizedBox(width: 16),
-                      Expanded(child: StatCard(title: 'Open / Baru', value: openTickets.toString(), color: Colors.cyan)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(child: StatCard(title: 'In Progress', value: inProgressTickets.toString(), color: Colors.orange)),
-                      const SizedBox(width: 16),
-                      Expanded(child: StatCard(title: 'Selesai (Closed)', value: closedTickets.toString(), color: Colors.green)),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Text('Aktivitas Tiket Terbaru', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  allTickets.isEmpty
-                      ? const Text('Belum ada aktivitas pelaporan keluhan.', style: TextStyle(color: Colors.grey))
-                      : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: allTickets.length > 3 ? 3 : allTickets.length,
-                    separatorBuilder: (context, index) => const Divider(),
-                    itemBuilder: (context, index) {
-                      final ticket = allTickets[index];
-                      return ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.history)),
-                        title: Text('Tiket "${ticket.title}" terdeteksi'),
-                        subtitle: Text('Status: ${ticket.status.name.toUpperCase()} • ID: ${ticket.id}'),
-                      );
-                    },
-                  ),
-                ],
+          body: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [dynamicBgDeep, dynamicBgElevated],
               ),
             ),
-          );
-        },
-      ),
+            child: FutureBuilder<List<Ticket>>(
+              future: _ticketsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: AppColors.amber));
+                }
+
+                List<Ticket> allTickets = snapshot.data ?? [];
+                if (user?.role == UserRole.user) {
+                  allTickets = allTickets.where((t) => t.creatorId == user!.id).toList();
+                }
+
+                final totalTickets = allTickets.length;
+                final openTickets = allTickets.where((t) => t.status == TicketStatus.open).length;
+                final inProgressTickets = allTickets.where((t) => t.status == TicketStatus.inProgress).length;
+                final closedTickets = allTickets.where((t) => t.status == TicketStatus.closed).length;
+
+                return RefreshIndicator(
+                  color: AppColors.amber,
+                  onRefresh: () async {
+                    setState(() {
+                      _ticketsFuture = _apiService.getTickets();
+                    });
+                  },
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 🤖 DIAGNOSTIC CHIP BADGE LOGO - Penambah Visual Estetik Agar Tidak Kosong
+                        Row(
+                          children: [
+                            Container(
+                              width: 54, height: 54,
+                              decoration: BoxDecoration(
+                                color: dynamicSurface,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: dynamicBorder, width: 1.2),
+                                boxShadow: [BoxShadow(color: AppColors.amber.withOpacity(0.1), blurRadius: 12)],
+                              ),
+                              child: const Icon(Icons.app_settings_alt_rounded, size: 28, color: AppColors.amber),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Selamat Datang, ${user?.name ?? 'User'}!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: dynamicTextPrimary)),
+                                  const SizedBox(height: 2),
+                                  Text('Sistem Operasional Diagnostik • ${user?.role.name.toUpperCase()}', style: TextStyle(color: AppColors.amber, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                                ],
+                              ),
+                            )
+                          ],
+                        ),
+                        const SizedBox(height: 28),
+
+                        // STAT CARDS SKEMA BARU
+                        Row(
+                          children: [
+                            Expanded(child: StatCard(title: 'Total Tiket', value: totalTickets.toString(), color: AppColors.amber, isDark: isDark)),
+                            const SizedBox(width: 14),
+                            Expanded(child: StatCard(title: 'Open / Baru', value: openTickets.toString(), color: const Color(0xFF38BDF8), isDark: isDark)),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(child: StatCard(title: 'In Progress', value: inProgressTickets.toString(), color: const Color(0xFFFB923C), isDark: isDark)),
+                            const SizedBox(width: 14),
+                            Expanded(child: StatCard(title: 'Selesai (Closed)', value: closedTickets.toString(), color: const Color(0xFF4ADE80), isDark: isDark)),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                        Text('Aktivitas Tiket Terbaru', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: dynamicTextPrimary)),
+                        const SizedBox(height: 12),
+                        allTickets.isEmpty
+                            ? Text('Belum ada aktivitas pelaporan keluhan.', style: TextStyle(color: dynamicTextMuted, fontStyle: FontStyle.italic))
+                            : ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: allTickets.length > 3 ? 3 : allTickets.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final ticket = allTickets[index];
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: dynamicSurface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: dynamicBorder, width: 0.8),
+                              ),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: AppColors.amber.withOpacity(0.1),
+                                  child: const Icon(Icons.history_toggle_off_rounded, color: AppColors.amber),
+                                ),
+                                title: Text('Tiket "${ticket.title}"', style: TextStyle(fontWeight: FontWeight.bold, color: dynamicTextPrimary, fontSize: 14)),
+                                subtitle: Text('ID: ${ticket.id} • Status: ${ticket.status.name.toUpperCase()}', style: TextStyle(color: dynamicTextMuted, fontSize: 12)),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -243,19 +319,34 @@ class StatCard extends StatelessWidget {
   final String title;
   final String value;
   final Color color;
-  const StatCard({super.key, required this.title, required this.value, required this.color});
+  final bool isDark;
+
+  const StatCard({super.key, required this.title, required this.value, required this.color, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color)),
+      decoration: BoxDecoration(
+          color: isDark ? AppColors.surface : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isDark ? AppColors.border : const Color(0xFFCBD5E1), width: 1),
+          boxShadow: [
+            BoxShadow(color: color.withOpacity(0.06), blurRadius: 10, spreadRadius: 1)
+          ]
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(value, style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: color, fontWeight: FontWeight.bold)),
+          Row(
+            children: [
+              Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              const SizedBox(width: 8),
+              Text(title, style: TextStyle(color: isDark ? AppColors.textMuted : const Color(0xFF64748B), fontWeight: FontWeight.w600, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 28)),
         ],
       ),
     );
