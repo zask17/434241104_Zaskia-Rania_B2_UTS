@@ -90,7 +90,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
-          floatingActionButton: (_selectedIndex == 1 && isUser)
+          floatingActionButton: (_selectedIndex == 1) // Terbuka untuk semua role di tab list tiket
               ? FloatingActionButton(
             backgroundColor: AppColors.amber,
             foregroundColor: const Color(0xFF121824),
