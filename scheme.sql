@@ -153,22 +153,26 @@ FOR SELECT USING (
 -- ==========================================
 -- TRIGGER DAN FUNGSI
 -- ==========================================
--- ====================================================================
 
 -- 1. MEMBUAT FUNGSI TRIGGER OTOMATIS UNTUK NOTIFIKASI TIKET
 CREATE OR REPLACE FUNCTION trigger_ticket_notification()
 RETURNS TRIGGER
-SECURITY DEFINER -- Berjalan sebagai sistem pembuat fungsi (bypass RLS internal)
-SET search_path = public, pg_temp -- Mengunci search_path (Fix linter 0011)
+SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
+DECLARE
+    v_creator_role_id INT;
 BEGIN
+    -- Ambil role_id asli dari user pembuat tiket
+    SELECT role_id INTO v_creator_role_id FROM users WHERE id = NEW.creator_id;
+
     -- JIKA TIKET BARU DIBUAT (STATUS: OPEN)
     IF (TG_OP = 'INSERT') THEN
-        -- Notif untuk User Pembuat
+        -- Notif personal untuk Pembuat (apapun rolenya sekarang menjadi dinamis)
         INSERT INTO notifications (ticket_id, title, description, target_role_id, target_user_id)
-        VALUES (NEW.id, 'Tiket Berhasil Dibuat', 'Tiket #' || NEW.id || ' ("' || NEW.title || '") berhasil diajukan dengan status OPEN.', 3, NEW.creator_id);
+        VALUES (NEW.id, 'Tiket Berhasil Dibuat', 'Tiket #' || NEW.id || ' ("' || NEW.title || '") berhasil diajukan dengan status OPEN.', v_creator_role_id, NEW.creator_id);
 
-        -- Notif untuk Admin & Helpdesk
+        -- Notif siaran global untuk Admin & Helpdesk lainnya
         INSERT INTO notifications (ticket_id, title, description, target_role_id)
         VALUES (NEW.id, 'Tiket Baru Masuk (OPEN)', 'User ' || NEW.creator_name || ' membuat tiket baru: "' || NEW.title || '".', 1);
         INSERT INTO notifications (ticket_id, title, description, target_role_id)
@@ -176,17 +180,15 @@ BEGIN
 
     -- JIKA STATUS TIKET BERUBAH (UPDATE)
     ELSIF (TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM NEW.status) THEN
-        -- Notif untuk User Pembuat saat In Progress atau Closed
+        -- Notif perkembangan status untuk User Pembuat
         INSERT INTO notifications (ticket_id, title, description, target_role_id, target_user_id)
-        VALUES (NEW.id, 'Status Tiket Diperbarui', 'Tiket Anda #' || NEW.id || ' kini berubah status menjadi ' || UPPER(NEW.status) || '.', 3, NEW.creator_id);
+        VALUES (NEW.id, 'Status Tiket Diperbarui', 'Tiket Anda #' || NEW.id || ' kini berubah status menjadi ' || UPPER(NEW.status) || '.', v_creator_role_id, NEW.creator_id);
 
-        -- Jika Admin memajukan ke In Progress, Helpdesk dapat notif khusus
         IF (NEW.status = 'inProgress') THEN
             INSERT INTO notifications (ticket_id, title, description, target_role_id)
             VALUES (NEW.id, 'Tiket Siap Dikerjakan', 'Tiket #' || NEW.id || ' telah dialihkan oleh Admin menjadi IN PROGRESS.', 2);
         END IF;
 
-        -- Jika Helpdesk menutup tiket menjadi Closed, Admin & User dapat notif
         IF (NEW.status = 'closed') THEN
             INSERT INTO notifications (ticket_id, title, description, target_role_id)
             VALUES (NEW.id, 'Tiket Servis Selesai (CLOSED)', 'Tiket #' || NEW.id || ' resmi ditutup oleh staff Helpdesk.', 1);
@@ -233,6 +235,56 @@ CREATE TRIGGER comment_notify_trigger
 AFTER INSERT ON ticket_comments
 FOR EACH ROW EXECUTE FUNCTION trigger_comment_notification();
 
+
+-- ====================================================================
+-- FORGOT PASSWORD
+-- ====================================================================
+
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS reset_token TEXT,
+ADD COLUMN IF NOT EXISTS reset_token_expires_at TIMESTAMPTZ;
+
+-- FUNGSI UNTUK MERESET PASSWORD SECARA AMAN
+
+CREATE OR REPLACE FUNCTION reset_password_with_token(
+    p_email TEXT,
+    p_token TEXT,
+    p_new_password TEXT
+)
+RETURNS BOOLEAN
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_user_id TEXT;
+BEGIN
+    -- Cek apakah email, token, dan masa berlaku token valid
+    SELECT id INTO v_user_id
+    FROM users
+    WHERE email = p_email
+      AND reset_token = p_token
+      AND reset_token_expires_at > NOW();
+
+    -- Jika user tidak ditemukan atau token kedaluwarsa
+    IF v_user_id IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Update password baru dan hapus token yang sudah dipakai
+    UPDATE users
+    SET password = p_new_password,
+        reset_token = NULL,
+        reset_token_expires_at = NULL
+    WHERE id = v_user_id;
+
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Cabut akses fungsi reset dari publik dan berikan ke role anon & authenticated
+REVOKE EXECUTE ON FUNCTION reset_password_with_token(TEXT, TEXT, TEXT) FROM public;
+GRANT EXECUTE ON FUNCTION reset_password_with_token(TEXT, TEXT, TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION reset_password_with_token(TEXT, TEXT, TEXT) TO authenticated;
 
 -- ====================================================================
 -- 1. REVISI : CABUT HAK EKSEKUSI DARI ROLE PUBLIK (ANON & AUTHENTICATED)

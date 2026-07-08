@@ -90,6 +90,79 @@ class ApiService {
     return 'HTTP ${response.statusCode}: ${response.reasonPhrase ?? 'Unknown error'}';
   }
 
+  // ==================== AUTH UTILS ====================
+
+  /// Cek apakah email terdaftar di sistem (Optimasi encoding)
+  Future<bool> checkEmailExists(String email) async {
+    try {
+      final uri = Uri.parse('$baseUrl/users').replace(queryParameters: {
+        'select': 'id',
+        'email': 'eq.$email',
+      });
+      final response = await http.get(uri, headers: _getHeaders());
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.isNotEmpty;
+      }
+      return false;
+    } catch (e) {
+      print('Check Email Error: $e');
+      return false;
+    }
+  }
+
+  /// Menyimpan token reset password dan batas waktu berlaku (1 jam) ke Supabase
+  Future<bool> saveResetToken(String email, String token) async {
+    try {
+      final expiresAt = DateTime.now().add(const Duration(hours: 1)).toIso8601String();
+
+      final response = await http.patch(
+        Uri.parse('$baseUrl/users?email=eq.$email'),
+        headers: _getHeaders(),
+        body: jsonEncode({
+          'reset_token': token,
+          'reset_token_expires_at': expiresAt,
+        }),
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        print('Save Reset Token Failed: \${response.statusCode} - \${response.body}');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      print('Save Reset Token Error: $e');
+      return false;
+    }
+  }
+
+  /// Reset password menggunakan token via RPC Supabase
+  Future<bool> resetPasswordWithToken({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/rpc/reset_password_with_token'),
+        headers: _getHeaders(),
+        body: jsonEncode({
+          'p_email': email,
+          'p_token': token,
+          'p_new_password': newPassword,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) == true;
+      }
+      return false;
+    } catch (e) {
+      print('Reset Password RPC Error: $e');
+      return false;
+    }
+  }
+
   // ==================== REGISTER ====================
 
   /// Mendaftarkan user baru ke tabel `users` di Supabase.
@@ -372,7 +445,6 @@ class ApiService {
   /// Mengambil daftar notifikasi terbaru dari database Supabase secara riil
   Future<List<dynamic>?> fetchLiveNotifications({required int roleId, required String userId}) async {
     try {
-      // Filter query bertingkat sesuai hak target role / target user id
       String queryUrl = '$baseUrl/notifications?select=*&order=created_at.desc';
       if (roleId == 3) {
         queryUrl += '&target_user_id=eq.$userId';

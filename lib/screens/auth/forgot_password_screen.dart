@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
 import '../widget/custom_widget.dart';
 import '../../theme/app_theme.dart' show AppColors;
 import '../../data/theme_settings.dart';
+import '../../services/api_service.dart';
+import '../../services/email_service.dart';
+import 'reset_password_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -13,6 +17,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  final ApiService _apiService = ApiService();
   bool _isLoading = false;
 
   @override
@@ -24,14 +29,65 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   void _handleResetPassword() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      await Future.delayed(const Duration(seconds: 2));
+
+      final email = _emailController.text.trim();
+
+      // 1. Cek apakah email terdaftar
+      final exists = await _apiService.checkEmailExists(email);
+
+      if (!exists) {
+        setState(() => _isLoading = false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Email tidak terdaftar!'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      // 2. Buat token reset (6 digit angka)
+      final randomToken = (Random().nextInt(899999) + 100000).toString();
+
+      // 3. Simpan token ke database Supabase
+      final tokenSaved = await _apiService.saveResetToken(email, randomToken);
+
+      if (!tokenSaved) {
+        setState(() => _isLoading = false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal membuat permintaan reset password.'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      // 4. Kirim email via Mailtrap
+      final resetLink = "https://ticketing-app.example/reset?email=$email&token=$randomToken";
+      print('Attempting to send email to $email with link: $resetLink');
+      final success = await EmailService.sendResetPasswordEmail(email, resetLink);
+
       setState(() => _isLoading = false);
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Link reset password telah dikirim!'), backgroundColor: Colors.green),
-      );
-      Navigator.pop(context);
+      if (success) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Token reset password telah dikirim ke email Anda!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Pindah ke halaman input password baru
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ResetPasswordScreen(email: email),
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal mengirim email. Silakan coba lagi.'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
